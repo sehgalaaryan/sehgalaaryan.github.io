@@ -1,7 +1,76 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Under Development</title>
     
-<body>
-  <h1>This website is under development. Please come back soon.</h1>
-</body>
+    <style>
+        /* Base styling and centering */
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #fafafa;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            text-align: center;
+            padding: 0 20px;
+        }
 
+        /* Modern status badge */
+        .badge {
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #007aff;
+            background: rgba(0, 122, 255, 0.1);
+            padding: 6px 14px;
+            border-radius: 20px;
+            margin-bottom: 24px;
+            animation: fadeUp 0.8s ease-out;
+        }
+
+        /* Primary heading typography */
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin: 0 0 16px 0;
+            letter-spacing: -0.03em;
+            /* The 'both' keyword and '0.1s' delay create the staggered effect */
+            animation: fadeUp 0.8s ease-out 0.1s both; 
+        }
+
+        /* Readable subtext */
+        p {
+            font-size: 1.15rem;
+            color: #666;
+            margin: 0;
+            max-width: 420px;
+            line-height: 1.6;
+            animation: fadeUp 0.8s ease-out 0.2s both;
+        }
+
+        /* Smooth slide-up and fade-in animation */
+        @keyframes fadeUp {
+            from { 
+                opacity: 0; 
+                transform: translateY(15px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="badge">Coming Soon</div>
+    <h1>Under Development</h1>
+    <p>Working hard behind the scenes to bring you a great experience. Please check back shortly.</p>
+</body>
 </html>
