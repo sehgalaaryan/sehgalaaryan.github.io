@@ -38,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Physics constants
     const GRAVITY = 0.6;
     const RELAXATION_ITERATIONS = 50;
-    const YIELD_STRESS = 0.08; // Significantly more brittle to enforce trusses
+    const YIELD_STRESS = 0.03; // Hyper brittle to enforce proper load bearing trusses
     const MAX_BEAM_LENGTH = 140; // Max allowed distance to draw a beam
 
     // Vehicle Data
@@ -108,6 +108,25 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes.push(new Node(bankLeftX, bankY + 80, true));
             nodes.push(new Node(bankRightX, bankY, true));
             nodes.push(new Node(bankRightX, bankY + 80, true));
+        } else if (currentLevel === 'highway') {
+            budget = 20000;
+            const gapWidth = Math.min(canvas.width * 0.7, 700);
+            bankLeftX = (canvas.width - gapWidth) / 2;
+            bankRightX = bankLeftX + gapWidth;
+            bankY = canvas.height * 0.5;
+            
+            // Banks
+            nodes.push(new Node(bankLeftX, bankY, true));
+            nodes.push(new Node(bankLeftX, bankY + 80, true));
+            nodes.push(new Node(bankRightX, bankY, true));
+            nodes.push(new Node(bankRightX, bankY + 80, true));
+
+            // Central Massive Pier
+            const pX = canvas.width / 2;
+            nodes.push(new Node(pX - 30, canvas.height * 0.45, true));
+            nodes.push(new Node(pX + 30, canvas.height * 0.45, true));
+            nodes.push(new Node(pX - 30, canvas.height * 0.6, true));
+            nodes.push(new Node(pX + 30, canvas.height * 0.6, true));
         }
 
         car.x = bankLeftX - 50;
@@ -296,11 +315,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 targetRightX = bLeftX + w;
                 bankYCheck = canvas.height * 0.6;
                 if(car.x <= bLeftX || car.x >= targetRightX) trackY = bankYCheck;
-            } else {
+            } else if (currentLevel === 'city') {
                 const w = Math.min(canvas.width * 0.8, 800);
                 let bLeftX = (canvas.width - w) / 2;
                 targetRightX = bLeftX + w;
                 bankYCheck = canvas.height * 0.4;
+                if(car.x <= bLeftX || car.x >= targetRightX) trackY = bankYCheck;
+            } else {
+                const w = Math.min(canvas.width * 0.7, 700);
+                let bLeftX = (canvas.width - w) / 2;
+                targetRightX = bLeftX + w;
+                bankYCheck = canvas.height * 0.5;
                 if(car.x <= bLeftX || car.x >= targetRightX) trackY = bankYCheck;
             }
 
@@ -308,14 +333,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Stick to track
                 car.y = trackY - 10;
                 
-                // Apply Car Weight to driving beam (MASSIVELY heavy)
+                // Track Slope Calculation
                 if(currentBeam && car.x > 0 && car.x < targetRightX) {
-                    let dX = currentBeam.nodeB.x - currentBeam.nodeA.x;
-                    let tPrc = (car.x - currentBeam.nodeA.x) / dX; // 0 to 1
-                    let load = GRAVITY * 14.0; 
+                    let dX = Math.abs(currentBeam.nodeB.x - currentBeam.nodeA.x);
+                    let leftNodeY = currentBeam.nodeA.x < currentBeam.nodeB.x ? currentBeam.nodeA.y : currentBeam.nodeB.y;
+                    let rightNodeY = currentBeam.nodeA.x < currentBeam.nodeB.x ? currentBeam.nodeB.y : currentBeam.nodeA.y;
                     
-                    if (!currentBeam.nodeA.fixed) currentBeam.nodeA.y += load * (1 - tPrc);
-                    if (!currentBeam.nodeB.fixed) currentBeam.nodeB.y += load * tPrc;
+                    // + slope is uphill (right node is HIGHER visually on screen, meaning lower Y value)
+                    let slope = (leftNodeY - rightNodeY) / dX;
+
+                    if (slope > 0.45) { // Too steep uphill
+                        car.speed = 0; // Stall!
+                        car.state = 'failed';
+                        showGameStatus(false, 'Vehicle Stalled! The bridge shifted/sagged into a steep ditch (+24 deg). Build stronger trusses!');
+                    } else if (slope < -0.8) {
+                        car.speed = 0; // Nosedive crash
+                        car.state = 'failed';
+                        showGameStatus(false, 'Vehicle Crashed! The decline was too steep!');
+                    }
+
+                    // Apply Heavy Weight Load
+                    if(car.speed > 0) {
+                        let totalDx = currentBeam.nodeB.x - currentBeam.nodeA.x;
+                        let tPrc = (car.x - currentBeam.nodeA.x) / totalDx; 
+                        let load = GRAVITY * 16.0; 
+                        
+                        if (!currentBeam.nodeA.fixed) currentBeam.nodeA.y += load * (1 - tPrc);
+                        if (!currentBeam.nodeB.fixed) currentBeam.nodeB.y += load * tPrc;
+                    }
                 }
             } else {
                 // Freefall (bridge broke or gap!)
@@ -376,6 +421,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.fillRect(bX + gw + 20, y, 30, 20);
             }
             ctx.globalAlpha = 1.0;
+        } else if (currentLevel === 'highway') {
+            ctx.fillStyle = '#64748b'; // slate road banks
+            const gw = Math.min(canvas.width * 0.7, 700);
+            const bX = (canvas.width - gw) / 2;
+            ctx.fillRect(0, canvas.height * 0.5, bX, canvas.height * 0.5);
+            ctx.fillRect(bX + gw, canvas.height * 0.5, canvas.width, canvas.height * 0.5);
+            
+            // Draw Pier
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(canvas.width / 2 - 30, canvas.height * 0.45, 60, canvas.height * 0.55);
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(canvas.width / 2 - 20, canvas.height * 0.45, 40, canvas.height * 0.55);
         }
 
         if (draggingStartNode && !isSimulating) {
