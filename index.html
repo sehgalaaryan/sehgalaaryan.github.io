@@ -1,76 +1,252 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Under Development</title>
-    
-    <style>
-        /* Base styling and centering */
-        body {
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            background-color: #fafafa;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            text-align: center;
-            padding: 0 20px;
-        }
-
-        /* Modern status badge */
-        .badge {
-            font-size: 0.85rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: #007aff;
-            background: rgba(0, 122, 255, 0.1);
-            padding: 6px 14px;
-            border-radius: 20px;
-            margin-bottom: 24px;
-            animation: fadeUp 0.8s ease-out;
-        }
-
-        /* Primary heading typography */
-        h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: #1a1a1a;
-            margin: 0 0 16px 0;
-            letter-spacing: -0.03em;
-            /* The 'both' keyword and '0.1s' delay create the staggered effect */
-            animation: fadeUp 0.8s ease-out 0.1s both; 
-        }
-
-        /* Readable subtext */
-        p {
-            font-size: 1.15rem;
-            color: #666;
-            margin: 0;
-            max-width: 420px;
-            line-height: 1.6;
-            animation: fadeUp 0.8s ease-out 0.2s both;
-        }
-
-        /* Smooth slide-up and fade-in animation */
-        @keyframes fadeUp {
-            from { 
-                opacity: 0; 
-                transform: translateY(15px); 
-            }
-            to { 
-                opacity: 1; 
-                transform: translateY(0); 
-            }
-        }
-    </style>
+    <title>Aaryan Sehgal | Bridge Engineer</title>
+    <!-- Google Fonts for modern typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;800&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="badge">Coming Soon</div>
-    <h1>Under Development</h1>
-    <p>Working hard behind the scenes to bring you a great experience. Please check back shortly.</p>
+    <!-- Custom animated cursor -->
+    <div class="cursor-dot"></div>
+    <div class="cursor-outline"></div>
+
+    <!-- Animated moving background specific to themes -->
+    <div class="gradient-bg"></div>
+
+    <!-- Navigation Menu -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <div class="hamburger" id="nav-toggle">
+                <div class="line"></div>
+                <div class="line"></div>
+                <div class="line"></div>
+            </div>
+            <div class="logo group">
+                <span class="logo-static">AS</span><span class="logo-dot">.</span>
+            </div>
+        </div>
+        
+        <!-- Responsive Nav Links -->
+        <ul class="nav-links" id="nav-menu">
+            <li><a href="#home" class="nav-item">Home</a></li>
+            <li><a href="#about" class="nav-item">About</a></li>
+            <li><a href="#projects" class="nav-item">Projects</a></li>
+            <li><a href="#skills" class="nav-item">Skills</a></li>
+            <li><a href="#game" class="nav-item">Game</a></li>
+            <li><a href="#contact" class="nav-item">Contact</a></li>
+        </ul>
+
+        <div class="theme-switcher">
+            <button class="theme-btn" data-theme-btn="light" title="Light Mode">☀️</button>
+            <button class="theme-btn active" data-theme-btn="dark" title="Dark Mode">🌙</button>
+            <button class="theme-btn" data-theme-btn="vibrant" title="Vibrant Mode">✨</button>
+        </div>
+    </nav>
+
+    <header class="hero scrub-target" id="home" data-scrub-type="hero">
+        <div class="hero-content">
+            <h2 class="subtitle">
+                <span class="typewriter" data-text="Dynamic Bridge Engineer | State-of-the-art Infrastructure"></span>
+            </h2>
+            <h1 class="title">Aaryan <span class="highlight animate-gradient-text">Sehgal</span></h1>
+            <p class="description">
+                I am a visionary Junior Bridge Designer at The Spannovation Group. Bringing 3.5 years of experience in orchestrating robust and breathtaking structural solutions.
+            </p>
+            <div class="cta-buttons">
+                <a href="#about" class="btn primary btn-glow">About Me</a>
+                <a href="#contact" class="btn outline hover-lift">Contact</a>
+            </div>
+        </div>
+        <div class="hero-graphic">
+            <!-- Elaborate animated shapes representing bridge engineering concepts -->
+            <div class="floating-shape shape-orb"></div>
+            <div class="floating-shape shape-orb-2"></div>
+            <div class="floating-shape shape-pyramid"></div>
+            <div class="bridge-wireframe">
+                <div class="cable"></div>
+                <div class="cable"></div>
+                <div class="cable"></div>
+                <div class="cable"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Moving strip animation -->
+    <div class="marquee-wrapper">
+        <div class="marquee">
+            <span>BRIDGE DESIGN</span> &bull; <span>STRUCTURAL ANALYSIS</span> &bull; <span>SEISMIC ENGINEERING</span> &bull; <span>PROJECT MANAGEMENT</span> &bull; 
+            <span>BRIDGE DESIGN</span> &bull; <span>STRUCTURAL ANALYSIS</span> &bull; <span>SEISMIC ENGINEERING</span> &bull; <span>PROJECT MANAGEMENT</span> &bull; 
+            <span>BRIDGE DESIGN</span> &bull; <span>STRUCTURAL ANALYSIS</span> &bull; <span>SEISMIC ENGINEERING</span> &bull; <span>PROJECT MANAGEMENT</span> &bull; 
+        </div>
+    </div>
+
+    <section id="about" class="section scrub-target" data-scrub-type="fade-up">
+        <div class="container section-grid">
+            <div class="section-image img-tilt">
+                <div class="image-wrapper">
+                    <div class="glow-backdrop"></div>
+                    <div class="image-placeholder">
+                        <span class="placeholder-text">Insert Photo here</span>
+                    </div>
+                </div>
+            </div>
+            <div class="section-text">
+                <h2 class="section-title">Elevating <span class="highlight">Infrastructure</span></h2>
+                <div class="glass-card">
+                    <p>
+                        I am an impassioned and detail-oriented Bridge Engineer dedicated to delivering world-class projects. For the past 3.5 years, I have been honing my expertise as a Junior Bridge Designer at <strong>The Spannovation Group</strong>.
+                    </p>
+                </div>
+                
+                <h3 class="subsection-heading mt-4">Experience & Education</h3>
+                <div class="experience-timeline">
+                    <div class="timeline-item scrub-target" data-scrub-type="slide-left">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>Junior Bridge Designer</h4>
+                            <span class="timeline-date">The Spannovation Group &bull; Present</span>
+                            <p class="timeline-text">Leading structural analysis and contributing to sophisticated bridge deployments.</p>
+                        </div>
+                    </div>
+                    <div class="timeline-item scrub-target" data-scrub-type="slide-left">
+                        <div class="timeline-dot edu-dot"></div>
+                        <div class="timeline-content">
+                            <h4>Bachelor's Degree in Civil Engineering</h4>
+                            <span class="timeline-date">Chandigarh College of Engineering & Technology (Affiliated to Punjab Univ.)</span>
+                        </div>
+                    </div>
+                    <div class="timeline-item scrub-target" data-scrub-type="slide-left">
+                        <div class="timeline-dot edu-dot"></div>
+                        <div class="timeline-content">
+                            <h4>Diploma in Civil Engineering</h4>
+                            <span class="timeline-date">CCET (Affiliated to Punjab State Board of Tech Education & Industrial Training)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Projects Section -->
+    <section id="projects" class="section scrub-target" data-scrub-type="fade-up">
+        <div class="container">
+            <h2 class="section-title center">Signature <span class="highlight">Projects</span></h2>
+            <div class="projects-grid mt-4">
+                <div class="project-card hover-3d scrub-target" data-scrub-type="scale-up">
+                    <div class="project-img">🌉</div>
+                    <div class="project-info">
+                        <h3>[Bridge Project Alpha]</h3>
+                        <p>Detailed structural assessment and design integration for a major suspended span.</p>
+                    </div>
+                </div>
+                <div class="project-card hover-3d scrub-target" data-scrub-type="scale-up">
+                    <div class="project-img">🛣️</div>
+                    <div class="project-info">
+                        <h3>[Highway Flyover Beta]</h3>
+                        <p>Pioneering earthquake-resilient designs using MIDAS Civil mapping.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="skills" class="section bg-secondary scrub-target" data-scrub-type="fade-up">
+        <div class="container">
+            <h2 class="section-title center">Technical <span class="highlight">Arsenal</span></h2>
+            <div class="skills-grid mt-4">
+                <div class="skill-card hover-3d scrub-target" data-scrub-type="slide-in">
+                    <div class="card-content">
+                        <div class="card-icon">🏗️</div>
+                        <h3>Structural Analysis</h3>
+                        <div class="skill-bar-container mt-4"><div class="skill-bar" data-width="95%"></div></div>
+                    </div>
+                </div>
+                <div class="skill-card hover-3d scrub-target" data-scrub-type="slide-in">
+                    <div class="card-content">
+                        <div class="card-icon">📐</div>
+                        <h3>SAP2000 / CSI Bridge</h3>
+                        <div class="skill-bar-container mt-4"><div class="skill-bar" data-width="90%"></div></div>
+                    </div>
+                </div>
+                <div class="skill-card hover-3d scrub-target" data-scrub-type="slide-in">
+                    <div class="card-content">
+                        <div class="card-icon">🌉</div>
+                        <h3>MIDAS Civil</h3>
+                        <div class="skill-bar-container mt-4"><div class="skill-bar" data-width="85%"></div></div>
+                    </div>
+                </div>
+                <div class="skill-card hover-3d scrub-target" data-scrub-type="slide-in">
+                    <div class="card-content">
+                        <div class="card-icon">💻</div>
+                        <h3>AutoCAD</h3>
+                        <div class="skill-bar-container mt-4"><div class="skill-bar" data-width="92%"></div></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- INteractive Game Section -->
+    <section id="game" class="section interactive-game-section scrub-target" data-scrub-type="scale-up">
+        <div class="container">
+            <h2 class="section-title center">Truss Builder <span class="highlight">Puzzle</span></h2>
+            <p class="center text-secondary mb-4">Connect tension beams to bridge the gap before your budget runs out. Run the simulation to see if the vehicle can cross safely!</p>
+            
+            <div class="game-container">
+                <div class="game-ui flex-wrap">
+                    <div class="game-tools flex-vertical">
+                        <div class="flex-row gap-4 mb-2">
+                            <select id="level-selector" class="game-select">
+                                <option value="river">Level 1: River Crossing</option>
+                                <option value="city">Level 2: City Skyscrapers</option>
+                            </select>
+                            <div class="budget-tracker">Budget: <span id="budget-display">$15,000</span></div>
+                        </div>
+                        <div class="game-hint hide-mobile">Left Click empty space to add anchor. Drag node-to-node to forge a steel beam (Costs $500 per meter). Right-click to refund/delete.</div>
+                    </div>
+                    <div class="game-actions flex-row gap-2">
+                        <button class="game-btn simulate-btn" id="btn-simulate">▶️ Test Drive</button>
+                        <button class="game-btn danger-btn" id="btn-reset">🔄 Reset Level</button>
+                    </div>
+                </div>
+
+                <!-- Game Status Banner -->
+                <div id="game-status" class="game-status hidden">
+                    <span id="status-text">Success! Vehicle Crossed</span>
+                    <button id="btn-status-close" class="btn outline minimal">Close</button>
+                </div>
+
+                <canvas id="bridge-canvas" class="bridge-canvas"></canvas>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="section bg-secondary scrub-target" data-scrub-type="fade-up">
+        <div class="container contact-container">
+            <h2 class="section-title">Get In <span class="highlight">Touch</span></h2>
+            <div class="glass-card contact-card">
+                <p>Always open to discussing new structural challenges or design opportunities.</p>
+                <a href="mailto:your.email@example.com" class="btn primary btn-glow mt-4">Send an Email</a>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container footer-content">
+            <p>&copy; 2026 Aaryan Sehgal.</p>
+            <div class="social-links hover-lift">
+                <a href="https://www.linkedin.com/in/aaryan-sehgal/" target="_blank" class="magnetic-btn">Let's Connect on LinkedIn</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+    <script src="game.js"></script>
 </body>
 </html>
