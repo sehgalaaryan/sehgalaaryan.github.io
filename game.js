@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (theme === 'vibrant') {
             themePalette = { riverBank: '#7e22ce', cityBank: '#4c1d95', hwBank: '#6d28d9', pier1: '#7e22ce', pier2: '#581c87', beam: '#ff007f', beamDraft: '#fbcfe8', nodeFixed: '#d8b4fe', nodeFree: '#00e6ff', nodeBorder: '#ffffff', carBase: '#d8b4fe', carBox: '#c084fc', wheel: '#581c87', mtnColor: '#1e1b4b' };
         } else if (theme === 'dark') {
-            themePalette = { riverBank: '#1e293b', cityBank: '#334155', hwBank: '#1e293b', pier1: '#64748b', pier2: '#475569', beam: '#f8fafc', beamDraft: '#cbd5e1', nodeFixed: '#94a3b8', nodeFree: '#3b82f6', nodeBorder: '#cbd5e1', carBase: '#cbd5e1', carBox: '#94a3b8', wheel: '#94a3b8', mtnColor: '#064e3b' };
+            themePalette = { riverBank: '#1e293b', cityBank: '#334155', hwBank: '#334155', pier1: '#64748b', pier2: '#475569', beam: '#f8fafc', beamDraft: '#cbd5e1', nodeFixed: '#94a3b8', nodeFree: '#3b82f6', nodeBorder: '#cbd5e1', carBase: '#cbd5e1', carBox: '#94a3b8', wheel: '#94a3b8', mtnColor: '#064e3b' };
         } else {
             themePalette = { riverBank: '#4b5563', cityBank: '#1e293b', hwBank: '#64748b', pier1: '#475569', pier2: '#334155', beam: '#1f2937', beamDraft: '#9ca3af', nodeFixed: '#111827', nodeFree: '#2563eb', nodeBorder: '#111827', carBase: '#1e293b', carBox: '#374151', wheel: '#111827', mtnColor: '#065f46' };
         }
@@ -63,7 +63,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Watch for theme changes
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
-            if (mutation.attributeName === 'data-theme') updateThemePalette();
+            if (mutation.attributeName === 'data-theme') {
+                updateThemePalette();
+                if (!isSimulating && nodes.length > 0) draw();
+            }
         });
     });
     observer.observe(document.documentElement, { attributes: true });
@@ -215,6 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         car.active = false;
         car.state = 'idle';
         firstBrokenBeam = null;
+        brokeAtX = 0; brokeAtY = 0; brokeStrain = 0;
         statusBanner.classList.add('hidden');
 
         if(animFrame) cancelAnimationFrame(animFrame);
@@ -387,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    levelSelector.addEventListener('change', initEnvironment);
+    levelSelector?.addEventListener('change', initEnvironment);
 
     // --- Buttons & UI Logic ---
     const modeToggleBtn = document.getElementById('btn-mode-toggle');
@@ -702,10 +706,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Win / Loss Conditions
             if (car.y > canvas.height) {
                 car.state = 'failed';
+                isSimulating = false; // Stop the simulation loop
                 let failReason = firstBrokenBeam ? `Beam snapped at ${Math.round(brokeStrain * 100)}% strain!` : 'Catastrophic Structural Failure! The vehicle fell.';
                 showGameStatus(false, failReason);
             } else if (car.x > levelState.bRightX + 20) {
                 car.state = 'passed';
+                isSimulating = false; // Stop the simulation loop
                 showGameStatus(true, 'Structural Integrity Confirmed! You Win!');
             }
         }
@@ -727,49 +733,93 @@ document.addEventListener('DOMContentLoaded', () => {
         statusBanner.classList.add('hidden');
     });
 
-      function draw() {
+    function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         const theme = document.documentElement.getAttribute('data-theme') || 'dark';
 
         // 1. SKY & DISTANT BACKGROUND (Atmospheric Layer)
         const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
         if (currentLevel === 'river') {
-            skyGrad.addColorStop(0, theme === 'light' ? '#bae6fd' : '#0c4a6e'); 
-            skyGrad.addColorStop(0.6, theme === 'light' ? '#f0f9ff' : '#075985');
-            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            levelBackgroundData.river.forEach(n => {
-                ctx.fillStyle = theme === 'light' ? '#7dd3fc' : '#0369a1';
-                ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
-            });
+            if (theme === 'vibrant') {
+                skyGrad.addColorStop(0, '#2d064e'); 
+                skyGrad.addColorStop(0.6, '#160436');
+                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                levelBackgroundData.river.forEach(n => {
+                    ctx.fillStyle = '#d8b4fe';
+                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
+                });
+            } else {
+                skyGrad.addColorStop(0, theme === 'light' ? '#bae6fd' : '#0c4a6e'); 
+                skyGrad.addColorStop(0.6, theme === 'light' ? '#f0f9ff' : '#075985');
+                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                levelBackgroundData.river.forEach(n => {
+                    ctx.fillStyle = theme === 'light' ? '#7dd3fc' : '#38bdf8'; // Sky blue tint
+                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
+                });
+            }
         } else if (currentLevel === 'city') {
-            skyGrad.addColorStop(0, theme === 'light' ? '#cbd5e1' : '#0f172a'); 
-            skyGrad.addColorStop(0.6, theme === 'light' ? '#f8fafc' : '#141e33'); 
-            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            levelBackgroundData.city.forEach(n => {
-                ctx.fillStyle = theme === 'light' ? '#64748b' : '#334155';
-                ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
-            });
+            if (theme === 'vibrant') {
+                skyGrad.addColorStop(0, '#160436'); 
+                skyGrad.addColorStop(0.6, '#090014'); 
+                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                levelBackgroundData.city.forEach(n => {
+                    ctx.fillStyle = '#b249f8';
+                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
+                });
+            } else {
+                skyGrad.addColorStop(0, theme === 'light' ? '#cbd5e1' : '#0f172a'); 
+                skyGrad.addColorStop(0.6, theme === 'light' ? '#f8fafc' : '#141e33'); 
+                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                levelBackgroundData.city.forEach(n => {
+                    ctx.fillStyle = theme === 'light' ? '#64748b' : '#cbd5e1'; // Brighter in dark mode
+                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
+                });
+            }
         } else if (currentLevel === 'mountain') {
-            skyGrad.addColorStop(0, theme === 'light' ? '#e2e8f0' : '#1e1b4b'); 
-            skyGrad.addColorStop(0.6, theme === 'light' ? '#f1f5f9' : '#312e81'); 
-            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            levelBackgroundData.mountain.forEach(n => {
-                ctx.fillStyle = theme === 'light' ? '#94a3b8' : '#3730a3';
-                ctx.globalAlpha = 0.2;
-                ctx.beginPath(); ctx.moveTo(n.x, canvas.height);
-                ctx.lineTo(n.x + n.w / 2, canvas.height - n.h);
-                ctx.lineTo(n.x + n.w, canvas.height); ctx.fill();
-            });
+            if (theme === 'vibrant') {
+                skyGrad.addColorStop(0, '#2d064e'); 
+                skyGrad.addColorStop(0.6, '#090014'); 
+                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                levelBackgroundData.mountain.forEach(n => {
+                    ctx.fillStyle = '#ff007f';
+                    ctx.globalAlpha = 0.2;
+                    ctx.beginPath(); ctx.moveTo(n.x, canvas.height);
+                    ctx.lineTo(n.x + n.w / 2, canvas.height - n.h);
+                    ctx.lineTo(n.x + n.w, canvas.height); ctx.fill();
+                });
+            } else {
+                skyGrad.addColorStop(0, theme === 'light' ? '#e2e8f0' : '#1e1b4b'); 
+                skyGrad.addColorStop(0.6, theme === 'light' ? '#f1f5f9' : '#312e81'); 
+                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                levelBackgroundData.mountain.forEach(n => {
+                    ctx.fillStyle = theme === 'light' ? '#94a3b8' : '#818cf8'; // Brighter in dark mode
+                    ctx.globalAlpha = 0.2;
+                    ctx.beginPath(); ctx.moveTo(n.x, canvas.height);
+                    ctx.lineTo(n.x + n.w / 2, canvas.height - n.h);
+                    ctx.lineTo(n.x + n.w, canvas.height); ctx.fill();
+                });
+            }
         } else {
             // Highway / Pylons
-            skyGrad.addColorStop(0, theme === 'light' ? '#cbd5e1' : '#0f172a'); 
-            skyGrad.addColorStop(0.6, theme === 'light' ? '#f8fafc' : '#1e293b');
-            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            const depthBG = (currentLevel === 'highway') ? levelBackgroundData.highway : levelBackgroundData.pylons;
-            depthBG.forEach(n => {
-                ctx.fillStyle = theme === 'light' ? '#94a3b8' : '#334155';
-                ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
-            });
+            if (theme === 'vibrant') {
+                skyGrad.addColorStop(0, '#160436');
+                skyGrad.addColorStop(0.6, '#090014');
+                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                const depthBG = (currentLevel === 'highway') ? levelBackgroundData.highway : levelBackgroundData.pylons;
+                depthBG.forEach(n => {
+                    ctx.fillStyle = '#b249f8'; // Purple haze silhouette
+                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
+                });
+            } else {
+                skyGrad.addColorStop(0, theme === 'light' ? '#cbd5e1' : '#0f172a'); 
+                skyGrad.addColorStop(0.6, theme === 'light' ? '#f8fafc' : '#1e293b');
+                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+                const depthBG = (currentLevel === 'highway') ? levelBackgroundData.highway : levelBackgroundData.pylons;
+                depthBG.forEach(n => {
+                    ctx.fillStyle = theme === 'light' ? '#94a3b8' : '#cbd5e1'; // Brighter in dark mode for visibility
+                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
+                });
+            }
         }
         ctx.globalAlpha = 1.0;
 
@@ -918,11 +968,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // React to theme changes to redraw instantly
-    const themeObserver = new MutationObserver(() => {
-        if (!isSimulating && nodes.length > 0) draw();
-    });
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    // (Theme change redraws are handled by the MutationObserver above)
 
     function distToSegment(p, v, w) {
         let l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
@@ -935,11 +981,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Buttons ---
     document.getElementById('btn-save-checkpoint')?.addEventListener('click', () => {
         if(isSimulating) return;
-        checkpointData.nodes = nodes.map(n => ({
-            relX: (n.x - levelState.bLeftX) / levelState.gapWidth,
-            relY: (n.y - levelState.bankY) / levelState.gapWidth,
-            fixed: n.fixed
-        }));
+        checkpointData.nodes = nodes.map(n => {
+            let relX = (n.x - levelState.bLeftX) / levelState.gapWidth;
+            let expectedBankY = levelState.isAsymmetric 
+                ? levelState.bankY + relX * (levelState.bankYRight - levelState.bankY)
+                : levelState.bankY;
+            return {
+                relX: relX,
+                relY: (n.y - expectedBankY) / levelState.gapWidth,
+                fixed: n.fixed
+            };
+        });
         checkpointData.beams = beams.map(b => ({
             idxA: nodes.indexOf(b.nodeA),
             idxB: nodes.indexOf(b.nodeB),
@@ -964,7 +1016,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         nodes = checkpointData.nodes.map(n => {
             let absoluteX = levelState.bLeftX + (n.relX * levelState.gapWidth);
-            let absoluteY = levelState.bankY + (n.relY * levelState.gapWidth);
+            let expectedBankY = levelState.isAsymmetric 
+                ? levelState.bankY + n.relX * (levelState.bankYRight - levelState.bankY)
+                : levelState.bankY;
+            let absoluteY = expectedBankY + (n.relY * levelState.gapWidth);
             return new Node(absoluteX, absoluteY, n.fixed);
         });
         beams = checkpointData.beams.map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size));

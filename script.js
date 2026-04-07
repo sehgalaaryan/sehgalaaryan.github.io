@@ -22,7 +22,8 @@ function initApp() {
     // Resize Handling
     window.addEventListener('resize', debounce(() => {
         AnimationEngine.updateScrollScrub();
-    }, 250));
+        AnimationEngine.updateHorizontalScroll();
+    }, 150));
 }
 
 // =========================================
@@ -65,7 +66,6 @@ const NavigationManager = {
         this.menu = document.getElementById('nav-menu');
 
         if (!this.toggle) return;
-
         this.toggle.addEventListener('click', () => {
             const isOpen = this.menu.classList.toggle('open');
             this.toggle.classList.toggle('active');
@@ -78,13 +78,6 @@ const NavigationManager = {
                 this.toggle.classList.remove('active');
                 this.toggle.setAttribute('aria-expanded', 'false');
             });
-        });
-
-        // Navbar scrolled state
-        window.addEventListener('scroll', () => {
-            const navbar = document.querySelector('.navbar');
-            if (window.scrollY > 50) navbar.classList.add('scrolled');
-            else navbar.classList.remove('scrolled');
         });
     }
 };
@@ -155,13 +148,14 @@ const AnimationEngine = {
     init() {
         this.scrubTargets = document.querySelectorAll('.scrub-target');
         this.initTypewriter();
-        this.initIntersectionObservers();
         this.init3DTilt();
 
         window.addEventListener('scroll', () => {
             if (!this.ticking) {
                 window.requestAnimationFrame(() => {
                     this.updateScrollScrub();
+                    this.updateHorizontalScroll();
+                    this.updateNavbar();
                     this.ticking = false;
                 });
                 this.ticking = true;
@@ -169,6 +163,13 @@ const AnimationEngine = {
         });
 
         this.updateScrollScrub();
+    },
+
+    updateNavbar() {
+        const navbar = document.querySelector('.navbar');
+        if (!navbar) return;
+        if (window.scrollY > 50) navbar.classList.add('scrolled');
+        else navbar.classList.remove('scrolled');
     },
 
     initTypewriter() {
@@ -237,16 +238,37 @@ const AnimationEngine = {
         });
     },
 
-    initIntersectionObservers() {
-        const skillBars = document.querySelectorAll('.skill-bar');
-        const obs = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.style.width = entry.target.getAttribute('data-width');
+    updateHorizontalScroll() {
+        const sections = document.querySelectorAll('.horizontal-section');
+        sections.forEach(section => {
+            const track = section.querySelector('.horizontal-track') || section.querySelector('.reverse-track');
+            const progressBar = section.querySelector('.scroll-progress-bar');
+            
+            if (!track) return;
+            
+            const rect = section.getBoundingClientRect();
+            const startVisible = rect.top;
+            const totalScrollable = rect.height - window.innerHeight;
+            
+            let progress = -startVisible / totalScrollable;
+            progress = Math.max(0, Math.min(1, progress));
+            
+            // Calculate max scroll distance dynamically bounding to the new CSS padded edges.
+            const maxScrollDist = track.scrollWidth - window.innerWidth;
+            
+            // Multiply by positive 1 for reverse-tracks, pulling the UI horizontally left-to-right.
+            const isReverse = track.classList.contains('reverse-track');
+            const direction = isReverse ? 1 : -1;
+            
+            track.style.transform = `translateX(${direction * progress * maxScrollDist}px)`;
+            
+            if (progressBar) {
+                progressBar.style.width = `${progress * 100}%`;
+                if (isReverse) {
+                    progressBar.style.float = 'right';
                 }
-            });
-        }, { threshold: 0.5 });
-        skillBars.forEach(bar => obs.observe(bar));
+            }
+        });
     },
 
     init3DTilt() {
@@ -396,10 +418,10 @@ const ContactForm = {
 };
 
 // Utils
-function debounce(func, wait) {
+const debounce = (func, wait) => {
     let timeout;
     return (...args) => {
         clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), wait);
+        timeout = setTimeout(() => func(...args), wait);
     };
-}
+};

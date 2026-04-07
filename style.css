@@ -26,10 +26,10 @@
 }
 
 [data-theme="light"] {
-    --bg-primary: #f8fafc;
-    --bg-secondary: #ffffff;
+    --bg-primary: #f1f5f9;
+    --bg-secondary: #e2e8f0;
     --bg-card: rgba(255, 255, 255, 0.95);
-    --bg-glass: rgba(255, 255, 255, 0.85);
+    --bg-glass: rgba(255, 255, 255, 0.65);
     --text-primary: #0f172a;
     --text-secondary: #334155;
     --accent: #2563eb;
@@ -62,19 +62,9 @@
 body { cursor: none; }
 a, button, .btn, .game-btn, .game-select, input, textarea, select { cursor: pointer !important; }
 
-::-webkit-scrollbar {
-    width: 0px !important;
-    height: 0px !important;
-    display: none !important;
-    background: transparent !important;
-}
-
-html {
-    scroll-behavior: smooth;
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-
+/* Global Scrollbar Reset: Ensure a clean, cinematic edge-to-edge experience */
+::-webkit-scrollbar { width: 0; height: 0; display: none; background: transparent; }
+html { scroll-behavior: smooth; -ms-overflow-style: none; scrollbar-width: none; }
 body {
     font-family: var(--font-body);
     background-color: var(--bg-primary);
@@ -93,10 +83,9 @@ a { text-decoration: none; color: inherit; }
 .section { padding: 8rem 0; position: relative; z-index: 2; overflow: hidden; }
 .section-title { font-size: clamp(2rem, 4vw, 3rem); margin-bottom: 2rem; }
 .center { text-align: center; }
+.mx-auto { margin: 0 auto !important; }
 .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: center; }
-.flex-wrap { display: flex; flex-wrap: wrap; }
 .ml-auto { margin-left: auto; }
-.mx-auto { margin-left: auto; margin-right: auto; }
 
 /* =========================================
    Custom Cursor
@@ -251,8 +240,7 @@ a { text-decoration: none; color: inherit; }
 /* =========================================
    About & Glassmorphism
 ========================================= */
-/* redundant definition removed by audit */
-.section-title.center { text-align: center; }
+.image-wrapper { position: relative; width: 100%; padding-bottom: 120%; /* 5:6 Aspect */ }
 
 .image-wrapper { position: relative; width: 100%; padding-bottom: 120%; /* 5:6 Aspect */ }
 .glow-backdrop { position: absolute; top: 10%; left: 10%; right: -10%; bottom: -10%; background: var(--gradient-text); filter: blur(50px); opacity: 0.3; border-radius: var(--radius-lg); animation: pulseBG 4s ease infinite alternate; }
@@ -261,10 +249,15 @@ a { text-decoration: none; color: inherit; }
 .glass-card { background: var(--bg-card); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--border-color); padding: 2rem; border-radius: var(--radius-md); box-shadow: var(--card-shadow); margin-bottom: 0rem; }
 .glass-card p { color: var(--text-secondary); }
 
-/* Timeline */
-.experience-timeline { padding-left: 0; }
-.timeline-item { display: grid; grid-template-columns: 40px 1fr; gap: 0.5rem; position: relative; padding-bottom: 1.5rem; }
-.timeline-item::before { content:''; position:absolute; left: 19px; top: 30px; bottom: 0px; width: 2px; background: var(--border-color); }
+/* Timeline & About Sticky Scroll */
+#about.section { overflow: visible; }
+.about-grid { align-items: flex-start; }
+.about-sticky-side { position: sticky; top: 15vh; display: flex; flex-direction: column; gap: 2rem; }
+.about-scroll-side { padding-bottom: 5rem; }
+
+.experience-timeline { padding-left: 0; display: flex; flex-direction: column; gap: 1.5rem; }
+.timeline-item { display: grid; grid-template-columns: 40px 1fr; gap: 0.5rem; position: relative; }
+.timeline-item::before { content:''; position:absolute; left: 19px; top: 30px; bottom: -30px; width: 2px; background: var(--border-color); }
 .timeline-item:last-child::before { display: none; }
 .timeline-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); margin-top: 10px; box-shadow: 0 0 12px var(--glow); position: relative; z-index: 2; justify-self: center; }
 .timeline-content { padding-top: 0; }
@@ -273,24 +266,29 @@ a { text-decoration: none; color: inherit; }
 .subsection-heading { font-size: 1.6rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.5rem; display: inline-block; }
 
 /* =========================================
-   Projects Section
+   Portfolio & Expertise (Horizontal Scrub)
 ========================================= */
-.projects-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; perspective: 1000px; }
-.project-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 2rem; display: flex; gap: 1.5rem; align-items: flex-start; backdrop-filter: blur(10px); transform-style: preserve-3d; }
+.horizontal-section { height: 400vh; position: relative; z-index: 10; margin-top: 4rem; }
+.sticky-container { position: sticky; top: 0; min-height: 100vh; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-primary); overflow: hidden; }
+.sticky-title { position: absolute; top: 15vh; left: 50%; transform: translateX(-50%); width: 100%; z-index: 5; }
+.horizontal-track { display: flex; gap: 3rem; padding: 0 calc(50vw - 200px); width: max-content; align-self: flex-start; will-change: transform; margin-top: 10vh; }
+.scroll-progress-container { position: absolute; bottom: 10vh; left: 20vw; width: 60vw; height: 4px; background: var(--border-color); border-radius: 4px; }
+.scroll-progress-bar { height: 100%; width: 0%; background: var(--gradient-text); border-radius: 4px; will-change: width; }
+.project-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 2.5rem; display: flex; flex-direction: column; gap: 1.5rem; align-items: flex-start; backdrop-filter: blur(10px); transform-style: preserve-3d; width: 400px; height: 400px; flex-shrink: 0; user-select: none; transition: box-shadow 0.3s ease; }
+.project-card:hover { box-shadow: 0 10px 40px var(--glow); }
 .project-img { font-size: 3.5rem; transform: translateZ(30px); }
 .project-info h3 { font-size: 1.3rem; margin-bottom: 0.5rem; color: var(--text-primary); }
 .project-info p { color: var(--text-secondary); font-size: 0.95rem; }
 
 /* =========================================
-   Skills Grid
+   Skills Section (Horizontal Scrub Reverse)
 ========================================= */
-.skills-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2.5rem; perspective: 1000px; }
-.skill-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 2.5rem; backdrop-filter: blur(10px); transform-style: preserve-3d; }
+.reverse-track { display: flex; gap: 3rem; padding: 0 calc(50vw - 175px); width: max-content; flex-direction: row-reverse; align-self: flex-end; will-change: transform; margin-top: 10vh; }
+.skill-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 2.5rem; display: flex; flex-direction: column; gap: 1.5rem; justify-content: center; backdrop-filter: blur(10px); transform-style: preserve-3d; width: 350px; height: 350px; flex-shrink: 0; user-select: none; transition: box-shadow 0.3s ease; }
+.skill-card:hover { box-shadow: 0 10px 40px var(--glow); }
 .card-content { transform: translateZ(30px); }
 .card-icon { font-size: 3rem; margin-bottom: 1.5rem; }
 .skill-card h3 { font-size: 1.3rem; margin-bottom: 0.5rem; }
-.skill-bar-container { width: 100%; height: 8px; background: rgba(120,120,120,0.15); border-radius: 10px; overflow: hidden; }
-.skill-bar { height: 100%; background: var(--gradient-text); width: 0; border-radius: 10px; transition: width 1.5s cubic-bezier(0.25, 1, 0.5, 1); }
 
 /* =========================================
    Game Section & Budget UI
@@ -355,7 +353,6 @@ a { text-decoration: none; color: inherit; }
 .game-btn.active svg { opacity: 1; stroke-width: 3; }
 .danger-btn, .btn-group .game-btn.danger-btn { color: #ef4444; }
 .danger-btn:hover, .btn-group .game-btn.danger-btn:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: #ef4444; }
-/* redundant ml-auto removed */
 .simulate-btn, .btn-group .game-btn.simulate-btn { 
     background: #10b981; 
     color: white; 
@@ -436,14 +433,22 @@ a { text-decoration: none; color: inherit; }
 }
 
 /* Fullscreen adjustments */
-.game-container:-webkit-full-screen { width: 100vw; height: 100vh; border-radius: 0; border: none; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; margin-top: 0; cursor: auto !important; }
-.game-container:fullscreen { width: 100vw; height: 100vh; border-radius: 0; border: none; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; margin-top: 0; cursor: auto !important; }
-.game-container:fullscreen button, .game-container:fullscreen select { cursor: pointer !important; }
-.game-container:-webkit-full-screen button, .game-container:-webkit-full-screen select { cursor: pointer !important; }
+.game-container:fullscreen, 
+.game-container:-webkit-full-screen { 
+    width: 100vw; height: 100vh; border-radius: 0; border: none; 
+    display: flex; flex-direction: column; align-items: center; justify-content: center; 
+    background: #000; margin-top: 0; cursor: auto !important; 
+}
+.game-container:fullscreen button, 
+.game-container:-webkit-full-screen button, 
+.game-container:fullscreen select, 
+.game-container:-webkit-full-screen select { cursor: pointer !important; }
+
+.game-container:fullscreen .bridge-canvas, 
 .game-container:-webkit-full-screen .bridge-canvas { flex-grow: 0; width: 100%; max-height: 80vh; aspect-ratio: 2 / 1; height: auto; }
-.game-container:fullscreen .bridge-canvas { flex-grow: 0; width: 100%; max-height: 80vh; aspect-ratio: 2 / 1; height: auto; }
+
+.game-container:fullscreen .game-ui, 
 .game-container:-webkit-full-screen .game-ui { width: 100%; max-width: 1200px; border-radius: 0; }
-.game-container:fullscreen .game-ui { width: 100%; max-width: 1200px; border-radius: 0; }
 
 /* Status Banner */
 .game-status {

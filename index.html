@@ -92,6 +92,7 @@
         </div>
     </nav>
 
+    <main>
     <header class="hero scrub-target" id="home" data-scrub-type="hero">
         <div class="hero-container">
             <div class="hero-content">
@@ -146,124 +147,193 @@
             </div>
         </div>
     </div>
-    <main>
     <section id="about" class="section scrub-target" data-scrub-type="fade-up">
-        <div class="container section-grid">
-            <div class="hero-graphic">
-                <!-- Elaborate animated shapes representing bridge engineering concepts -->
-                <div class="floating-shape shape-orb"></div>
-                <div class="floating-shape shape-orb-2"></div>
-                <div class="floating-shape shape-pyramid"></div>
-                <div class="bridge-wireframe">
-                    <div class="cable"></div>
-                    <div class="cable"></div>
-                    <div class="cable"></div>
-                    <div class="cable"></div>
+        <div class="container section-grid about-grid">
+            
+            <!-- Sticky Left Column -->
+            <div class="about-sticky-side" style="padding-top: 0;">
+                <h2 class="section-title" style="margin-top: -12px;">Engineering Resilient <span class="highlight">Infrastructure</span></h2>
+                <div class="hero-graphic">
+                    <div class="floating-shape shape-orb"></div>
+                    <div class="floating-shape shape-orb-2"></div>
+                    <div class="bridge-wireframe">
+                        <div class="cable"></div>
+                        <div class="cable"></div>
+                        <div class="cable"></div>
+                        <div class="cable"></div>
+                    </div>
                 </div>
             </div>
-            <div class="section-text">
-                <h2 class="section-title">Engineering Resilient <span class="highlight">Infrastructure</span></h2>
-                <h3 class="subsection-heading mt-2">Experience & Education</h3>
+
+            <!-- Scrollable Right Column -->
+            <div class="about-scroll-side" style="padding-top: 0;">
+                <h3 class="subsection-heading" style="margin-top: 0;">Experience &amp; Education</h3>
                 <div class="experience-timeline">
+                    <!-- Item 1 -->
                     <div class="timeline-item scrub-target" data-scrub-type="slide-left">
                         <div class="timeline-dot"></div>
                         <div class="timeline-content">
-                            <h4>Junior Bridge Designer</h4>
+                            <h4>Structural Bridge Engineer</h4>
                             <span class="timeline-date">The Spannovation Group &bull; Present</span>
-                            <p class="timeline-text">Executing advanced structural analysis and technical design for
-                                large & small scale bridge projects, ensuring compliance with international engineering
-                                codes
-                                and safety protocols.</p>
+                            <p class="timeline-text">Executing advanced structural analysis and technical design for large scale bridge projects, ensuring compliance with international engineering codes and safety protocols.</p>
                         </div>
                     </div>
+                    <!-- Item 2 -->
+                    <div class="timeline-item scrub-target" data-scrub-type="slide-left">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>Graduate Engineering Intern</h4>
+                            <span class="timeline-date">L&amp;T Construction &bull; 2022</span>
+                            <p class="timeline-text">Assisted senior engineers in the structural detailing of reinforced concrete superstructures and foundation systems for high-traffic municipal overpasses.</p>
+                        </div>
+                    </div>
+                    <!-- Item 3 -->
                     <div class="timeline-item scrub-target" data-scrub-type="slide-left">
                         <div class="timeline-dot"></div>
                         <div class="timeline-content">
                             <h4>Bachelor's Degree in Civil Engineering</h4>
-                            <span class="timeline-date">Chandigarh College of Engineering & Technology (Affiliated to
-                                Punjab University)</span>
+                            <span class="timeline-date">Chandigarh College of Engineering &amp; Technology (PU)</span>
+                            <p class="timeline-text">Specialized in advanced structural mechanics, seismic design, and finite element analysis.</p>
                         </div>
                     </div>
+                    <!-- Item 4 -->
                     <div class="timeline-item scrub-target" data-scrub-type="slide-left">
                         <div class="timeline-dot"></div>
                         <div class="timeline-content">
                             <h4>Diploma in Civil Engineering</h4>
-                            <span class="timeline-date">Chandigarh College of Engineering & Technology (Affiliated to
-                                Punjab State Board of Technical Education & Industrial Training)</span>
+                            <span class="timeline-date">Chandigarh College of Engineering &amp; Technology (PSBTE)</span>
+                        </div>
+                    </div>
+                    <!-- Item 5 (Placeholder) -->
+                    <div class="timeline-item scrub-target" data-scrub-type="slide-left">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>Design Sandbox Coordinator</h4>
+                            <span class="timeline-date">Creative Infrastructure Group &bull; 2021</span>
+                            <p class="timeline-text">Placeholder block. Simulated structural load failures using proprietary stress-testing software. Assisted in standardizing 3D rendering policies.</p>
+                        </div>
+                    </div>
+                    <!-- Item 6 (Placeholder) -->
+                    <div class="timeline-item scrub-target" data-scrub-type="slide-left">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>Junior AutoCAD Draftsman</h4>
+                            <span class="timeline-date">City Municipal Division &bull; 2020</span>
+                            <p class="timeline-text">Placeholder block. Drafted precise blueprints for city-wide pavement rehabilitation and retaining wall updates.</p>
+                        </div>
+                    </div>
+                    <!-- Item 7 (Placeholder) -->
+                    <div class="timeline-item scrub-target" data-scrub-type="slide-left">
+                        <div class="timeline-dot"></div>
+                        <div class="timeline-content">
+                            <h4>Field Inspecting Shadow</h4>
+                            <span class="timeline-date">Regional Transport Authority &bull; 2019</span>
+                            <p class="timeline-text">Placeholder block. Shadowed senior inspectors assessing the structural viability of legacy suspension bridges prior to renovation phases.</p>
                         </div>
                     </div>
                 </div>
             </div>
+
         </div>
     </section>
 
     <!-- Projects Section -->
-    <section id="projects" class="section scrub-target" data-scrub-type="fade-up">
-        <div class="container">
-            <h2 class="section-title center">Professional <span class="highlight">Portfolio</span></h2>
-            <div class="projects-grid mt-4">
-                <div class="project-card hover-3d scrub-target" data-scrub-type="scale-up"
-                    data-project-img="project-bridge.jpg">
+    <section id="projects" class="horizontal-section">
+        <div class="sticky-container">
+            <h2 class="section-title center sticky-title">Professional <span class="highlight">Portfolio</span></h2>
+            
+            <div class="horizontal-track scroll-target">
+                <!-- Project 1 -->
+                <div class="project-card hover-3d" data-project-img="project-bridge.jpg">
                     <div class="project-img">🌉</div>
                     <div class="project-info">
                         <h3>Long-Span Suspension Infrastructure</h3>
-                        <p>Conducted comprehensive structural evaluations and design optimizations for multi-span
-                            suspension systems, focusing on load distribution and dynamic stability.</p>
+                        <p>Conducted comprehensive structural evaluations and design optimizations for multi-span suspension systems, focusing on load distribution and dynamic stability.</p>
                     </div>
                 </div>
-                <div class="project-card hover-3d scrub-target" data-scrub-type="scale-up"
-                    data-project-img="project-highway.jpg">
+                <!-- Project 2 -->
+                <div class="project-card hover-3d" data-project-img="project-highway.jpg">
                     <div class="project-img">🛣️</div>
                     <div class="project-info">
                         <h3>Seismic-Resilient Transport Corridors</h3>
-                        <p>Implemented advanced seismic analysis and mitigation strategies for major highway flyovers
-                            using high-fidelity MIDAS Civil structural modeling.</p>
+                        <p>Implemented advanced seismic analysis and mitigation strategies for major highway flyovers using high-fidelity MIDAS Civil structural modeling.</p>
                     </div>
                 </div>
+                <!-- Project 3 -->
+                <div class="project-card hover-3d" data-project-img="project-placeholder.jpg">
+                    <div class="project-img">🏗️</div>
+                    <div class="project-info">
+                        <h3>Commercial Tower Foundation</h3>
+                        <p>Placeholder description for a future portfolio addition. Focus on deep foundation structural analysis and load path efficiency.</p>
+                    </div>
+                </div>
+                <!-- Project 4 -->
+                <div class="project-card hover-3d" data-project-img="project-placeholder.jpg">
+                    <div class="project-img">🏙️</div>
+                    <div class="project-info">
+                        <h3>Urban Wind Load Study</h3>
+                        <p>Placeholder description. Details on aerodynamic structural reinforcements for supertall skyscrapers in high-wind corridors.</p>
+                    </div>
+                </div>
+                <!-- Project 5 -->
+                <div class="project-card hover-3d" data-project-img="project-placeholder.jpg">
+                    <div class="project-img">🏢</div>
+                    <div class="project-info">
+                        <h3>Retrofitting Municipal Structures</h3>
+                        <p>Placeholder description. Outline of restoring and reinforcing century-old infrastructure to meet modern building codes.</p>
+                    </div>
+                </div>
+                <!-- Project 6 -->
+                <div class="project-card hover-3d" data-project-img="project-placeholder.jpg">
+                    <div class="project-img">🚆</div>
+                    <div class="project-info">
+                        <h3>High-Speed Rail Viaducts</h3>
+                        <p>Placeholder description. Design and integration of precast concrete segmental bridges for dynamic train loads.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="scroll-progress-container">
+                <div class="scroll-progress-bar"></div>
             </div>
         </div>
     </section>
 
-    <section id="skills" class="section bg-secondary scrub-target" data-scrub-type="fade-up">
-        <div class="container">
-            <h2 class="section-title center">Technical <span class="highlight">Expertise</span></h2>
-            <div class="skills-grid mt-4">
-                <div class="skill-card hover-3d scrub-target" data-scrub-type="slide-in">
+    <section id="skills" class="horizontal-section bg-secondary scrub-target" style="height: 200vh;" data-scrub-type="fade-up">
+        <div class="sticky-container">
+            <h2 class="section-title center sticky-title">Technical <span class="highlight">Expertise</span></h2>
+            
+            <div class="reverse-track scroll-target">
+                <div class="skill-card hover-3d">
                     <div class="card-content">
                         <div class="card-icon">🏗️</div>
                         <h3>Finite Element Analysis (FEA)</h3>
-                        <div class="skill-bar-container mt-4">
-                            <div class="skill-bar" data-width="95%"></div>
-                        </div>
                     </div>
                 </div>
-                <div class="skill-card hover-3d scrub-target" data-scrub-type="slide-in">
+                <div class="skill-card hover-3d">
                     <div class="card-content">
                         <div class="card-icon">📐</div>
                         <h3>SAP2000 / CSI Bridge</h3>
-                        <div class="skill-bar-container mt-4">
-                            <div class="skill-bar" data-width="90%"></div>
-                        </div>
                     </div>
                 </div>
-                <div class="skill-card hover-3d scrub-target" data-scrub-type="slide-in">
+                <div class="skill-card hover-3d">
                     <div class="card-content">
                         <div class="card-icon">🌉</div>
                         <h3>MIDAS Civil</h3>
-                        <div class="skill-bar-container mt-4">
-                            <div class="skill-bar" data-width="85%"></div>
-                        </div>
                     </div>
                 </div>
-                <div class="skill-card hover-3d scrub-target" data-scrub-type="slide-in">
+                <div class="skill-card hover-3d">
                     <div class="card-content">
                         <div class="card-icon">💻</div>
                         <h3>Bridge Geometry & Alignment</h3>
-                        <div class="skill-bar-container mt-4">
-                            <div class="skill-bar" data-width="92%"></div>
-                        </div>
                     </div>
                 </div>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="scroll-progress-container">
+                <div class="scroll-progress-bar"></div>
             </div>
         </div>
     </section>
@@ -272,7 +342,7 @@
     <section id="game" class="section interactive-game-section scrub-target" data-scrub-type="scale-up">
         <div class="container">
             <h2 class="section-title center">Truss Builder <span class="highlight">Puzzle</span></h2>
-            <p class="center text-secondary mx-auto mb-4" style="max-width: 800px;">
+            <p class="center text-secondary mb-4 mx-auto" style="max-width: 800px;">
                 Step into the shoes of a structural engineer! Design and optimize a bridge truss system to safely carry
                 heavy dynamic loads across the gap. Balance your budget, manage material efficiency, and test your
                 design's integrity against a real-time physics engine.
