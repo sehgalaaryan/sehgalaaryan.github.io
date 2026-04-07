@@ -230,9 +230,9 @@
     <section id="game" class="section interactive-game-section scrub-target" data-scrub-type="scale-up">
         <div class="container">
             <h2 class="section-title center">Truss Builder <span class="highlight">Puzzle</span></h2>
-            <p class="center text-secondary mb-4">Experience the fundamentals of structural engineering. Optimize a
-                truss system to withstand dynamic live loads while managing material efficiency and budgetary
-                constraints. Validate your design through a real-time physics-based simulation.</p>
+            <p class="center text-secondary mb-4" style="max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.8;">
+                Step into the shoes of a structural engineer! Design and optimize a bridge truss system to safely carry heavy dynamic loads across the gap. Balance your budget, manage material efficiency, and test your design's integrity against a real-time physics engine.
+            </p>
 
             <div class="game-container">
                 <div class="game-ui flex-wrap">
@@ -251,12 +251,20 @@
                             <div class="budget-tracker" style="margin-left: auto;">Budget: <span
                                     id="budget-display">$15,000</span></div>
                         </div>
-                        <div class="game-hint hide-mobile">Left Click empty space to add anchor. Drag node-to-node to
-                            forge a steel beam (Costs $500 per meter). Right-click to refund/delete.</div>
-                        <div class="game-hint show-mobile">Touch empty space to add anchor. Drag to forge a beam. Switch
-                            to Delete mode to remove.</div>
+                        <div class="game-hint hide-mobile">
+                            <div style="display: flex; gap: 0.4rem; align-items: flex-start;">
+                                <span style="font-size: 1.1rem; line-height: 1.2;">🖱️</span>
+                                <div><strong>Engineer Controls:</strong> Click any empty space to construct an anchor node. Click & drag between nodes to forge steel beams (costs adjust dynamically by length and type). Right-click any segment to dismantle and refund!</div>
+                            </div>
+                        </div>
+                        <div class="game-hint show-mobile">
+                            <div style="display: flex; gap: 0.4rem; align-items: flex-start;">
+                                <span style="font-size: 1.1rem; line-height: 1.2;">👆</span>
+                                <div><strong>Engineer Controls:</strong> Tap empty space to add an anchor node, then drag to construct beams. Switch to the 'Delete' tool below to dismantle components.</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="game-actions flex-row gap-2" style="width: 100%; flex-wrap: wrap;">
+                    <div class="game-actions flex-row gap-2" style="width: 100%; flex-wrap: wrap; margin-top: 1.5rem;">
                         <button class="game-btn outline" id="btn-mode-toggle" title="Toggle Build/Delete Mode">🔨
                             Build</button>
                         <button class="game-btn outline" id="btn-save-checkpoint" title="Save Structure State">💾
@@ -290,7 +298,7 @@
                 <p>I am available to discuss technical collaborations, structural engineering consulting, and innovative
                     infrastructure projects.</p>
                 <textarea id="contact-message" class="contact-input" placeholder="Type your message here..."
-                    rows="4"></textarea>
+                    rows="6"></textarea>
                 <button id="send-email-btn" class="btn primary btn-glow">Inquire via Email</button>
             </div>
         </div>

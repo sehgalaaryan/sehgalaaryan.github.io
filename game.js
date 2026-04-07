@@ -76,7 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return acc + (len * 5);
         }, 0);
         let remaining = budget - currentSpend;
-        budgetDisplay.innerText = `$${remaining.toLocaleString()}`;
+        budgetDisplay.innerText = `$${Math.round(remaining).toLocaleString()}`;
         if (remaining < 0) {
             budgetDisplay.classList.add('over-budget');
         } else {
@@ -497,23 +497,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Theme Colors
         const theme = document.documentElement.getAttribute('data-theme') || 'dark';
-        const isDark = theme === 'dark' || theme === 'vibrant';
-        
-        const p = {
-            riverBank: isDark ? '#64748b' : '#4b5563',
-            cityBank: isDark ? '#334155' : '#1e293b',
-            hwBank: isDark ? '#94a3b8' : '#64748b',
-            pier1: isDark ? '#64748b' : '#475569',
-            pier2: isDark ? '#475569' : '#334155',
-            beam: isDark ? '#f8fafc' : '#1f2937',
-            beamDraft: isDark ? '#cbd5e1' : '#9ca3af',
-            nodeFixed: isDark ? '#94a3b8' : '#111827',
-            nodeFree: isDark ? '#ffffff' : '#f3f4f6',
-            nodeBorder: isDark ? '#cbd5e1' : '#111827',
-            carBase: isDark ? '#cbd5e1' : '#1e293b',
-            carBox: isDark ? '#94a3b8' : '#374151',
-            wheel: isDark ? '#94a3b8' : '#111827'
-        };
+        let p = {};
+        if (theme === 'vibrant') {
+            p = {
+                riverBank: '#7e22ce',
+                cityBank: '#4c1d95',
+                hwBank: '#6d28d9',
+                pier1: '#7e22ce',
+                pier2: '#581c87',
+                beam: '#ff007f', 
+                beamDraft: '#fbcfe8',
+                nodeFixed: '#d8b4fe',
+                nodeFree: '#00e6ff',
+                nodeBorder: '#ffffff',
+                carBase: '#d8b4fe',
+                carBox: '#c084fc',
+                wheel: '#581c87'
+            };
+        } else if (theme === 'dark') {
+            p = {
+                riverBank: '#64748b',
+                cityBank: '#334155',
+                hwBank: '#94a3b8',
+                pier1: '#64748b',
+                pier2: '#475569',
+                beam: '#f8fafc',
+                beamDraft: '#cbd5e1',
+                nodeFixed: '#94a3b8',
+                nodeFree: '#3b82f6',
+                nodeBorder: '#cbd5e1',
+                carBase: '#cbd5e1',
+                carBox: '#94a3b8',
+                wheel: '#94a3b8'
+            };
+        } else {
+            p = {
+                riverBank: '#4b5563',
+                cityBank: '#1e293b',
+                hwBank: '#64748b',
+                pier1: '#475569',
+                pier2: '#334155',
+                beam: '#1f2937',
+                beamDraft: '#9ca3af',
+                nodeFixed: '#111827',
+                nodeFree: '#2563eb',
+                nodeBorder: '#111827',
+                carBase: '#1e293b',
+                carBox: '#374151',
+                wheel: '#111827'
+            };
+        }
 
         // Env
         if (currentLevel === 'river') {
