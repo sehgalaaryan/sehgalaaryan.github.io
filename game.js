@@ -46,6 +46,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Vehicle Data
     let car = { active: false, x: 0, y: 0, speed: 1.5, state: 'idle' };
 
+    // Checkpoints & Tracking
+    let checkpointData = { nodes: [], beams: [] };
+    let firstBrokenBeam = null;
+    let brokeAtX = 0; let brokeAtY = 0; let brokeStrain = 0;
+
     class Node {
         constructor(x, y, fixed = false) {
             this.x = x; this.y = y;
@@ -55,15 +60,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     class Beam {
-        constructor(nodeA, nodeB) {
+        constructor(nodeA, nodeB, size) {
             this.nodeA = nodeA; this.nodeB = nodeB;
             this.length = Math.hypot(nodeB.x - nodeA.x, nodeB.y - nodeA.y);
             this.strain = 0; this.broken = false;
+            this.size = size || 'standard';
         }
     }
 
     function updateBudgetUI() {
-        currentSpend = beams.length * COST_PER_BEAM;
+        currentSpend = beams.reduce((acc, b) => {
+            let len = b.length;
+            if (b.size === 'light') return acc + (len * 3);
+            if (b.size === 'heavy') return acc + (len * 8);
+            return acc + (len * 5);
+        }, 0);
         let remaining = budget - currentSpend;
         budgetDisplay.innerText = `$${remaining.toLocaleString()}`;
         if (remaining < 0) {
@@ -79,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isSimulating = false;
         car.active = false;
         car.state = 'idle';
+        firstBrokenBeam = null;
         statusBanner.classList.add('hidden');
 
         if(animFrame) cancelAnimationFrame(animFrame);
@@ -161,23 +173,37 @@ document.addEventListener('DOMContentLoaded', () => {
         fullscreenBtn.addEventListener('click', () => {
             const container = document.querySelector('.game-container');
             if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                if (container.requestFullscreen) {
-                    container.requestFullscreen();
-                } else if (container.webkitRequestFullscreen) { /* Safari */
-                    container.webkitRequestFullscreen();
+                let req = container.requestFullscreen ? container.requestFullscreen() : (container.webkitRequestFullscreen ? container.webkitRequestFullscreen() : null);
+                if (req && req.then) {
+                    req.then(() => {
+                        if (screen.orientation && screen.orientation.lock) {
+                            screen.orientation.lock("landscape").catch(e => console.warn(e));
+                        }
+                    }).catch(e => console.warn(e));
                 }
             } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                } else if (document.webkitExitFullscreen) { /* Safari */
-                    document.webkitExitFullscreen();
+                let req = document.exitFullscreen ? document.exitFullscreen() : (document.webkitExitFullscreen ? document.webkitExitFullscreen() : null);
+                if (req && req.then) {
+                    req.then(() => {
+                        if (screen.orientation && screen.orientation.unlock) {
+                            screen.orientation.unlock();
+                        }
+                    }).catch(e => console.warn(e));
+                } else if (document.exitFullscreen) {
+                    if (screen.orientation && screen.orientation.unlock) {
+                        screen.orientation.unlock();
+                    }
                 }
             }
         });
     }
 
-    document.addEventListener('fullscreenchange', () => setTimeout(resizeCanvas, 100));
-    document.addEventListener('webkitfullscreenchange', () => setTimeout(resizeCanvas, 100));
+    const toggleFsText = () => {
+        setTimeout(resizeCanvas, 100);
+        if(fullscreenBtn) fullscreenBtn.innerText = (document.fullscreenElement || document.webkitFullscreenElement) ? '🔲 Exit Full Screen' : '🔲 Full Screen';
+    };
+    document.addEventListener('fullscreenchange', toggleFsText);
+    document.addEventListener('webkitfullscreenchange', toggleFsText);
 
     // --- Interaction ---
     canvas.addEventListener('pointermove', (e) => {
@@ -265,9 +291,14 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Check illegal lengths
             if (dist > MAX_BEAM_LENGTH) {
-                draggingStartNode = null;
-                draw();
-                return;
+                let angle = Math.atan2(mousePos.y - draggingStartNode.y, mousePos.x - draggingStartNode.x);
+                mousePos.x = draggingStartNode.x + Math.cos(angle) * MAX_BEAM_LENGTH;
+                mousePos.y = draggingStartNode.y + Math.sin(angle) * MAX_BEAM_LENGTH;
+                dist = MAX_BEAM_LENGTH;
+                
+                if (hoveredNode && Math.hypot(mousePos.x - hoveredNode.x, mousePos.y - hoveredNode.y) > snapRadius) {
+                    targetNode = null;
+                }
             }
 
             if (!targetNode && dist > 20) {
@@ -282,7 +313,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         (b.nodeB === draggingStartNode && b.nodeA === targetNode)
                     );
                     if(!exists) {
-                        beams.push(new Beam(draggingStartNode, targetNode));
+                        const beamSize = document.getElementById('beam-size-selector') ? document.getElementById('beam-size-selector').value : 'standard';
+                        beams.push(new Beam(draggingStartNode, targetNode, beamSize));
                         updateBudgetUI();
                     }
                 }
@@ -326,8 +358,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 const diff = b.length - dist;
                 b.strain = Math.abs(diff) / b.length;
                 
-                if(b.strain > YIELD_STRESS && isSimulating) {
+                let targetYield = b.size === 'light' ? 0.015 : (b.size === 'heavy' ? 0.05 : 0.03);
+                
+                if(b.strain > targetYield && isSimulating) {
                     b.broken = true;  // Snap!
+                    if (!firstBrokenBeam) {
+                        firstBrokenBeam = b;
+                        brokeAtX = (b.nodeA.x + b.nodeB.x) / 2;
+                        brokeAtY = (b.nodeA.y + b.nodeB.y) / 2;
+                        brokeStrain = b.strain / targetYield;
+                    }
                 }
 
                 const percent = diff / dist / 2;
@@ -425,7 +465,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Win / Loss Conditions
             if (car.y > canvas.height) {
                 car.state = 'failed';
-                showGameStatus(false, 'Catastrophic Structural Failure! The vehicle fell.');
+                let failReason = firstBrokenBeam ? `Beam snapped at ${Math.round(brokeStrain * 100)}% strain!` : 'Catastrophic Structural Failure! The vehicle fell.';
+                showGameStatus(false, failReason);
             } else if (car.x > targetRightX + 20) {
                 car.state = 'passed';
                 showGameStatus(true, 'Structural Integrity Confirmed! You Win!');
@@ -454,9 +495,29 @@ document.addEventListener('DOMContentLoaded', () => {
     function draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // Theme Colors
+        const theme = document.documentElement.getAttribute('data-theme') || 'dark';
+        const isDark = theme === 'dark' || theme === 'vibrant';
+        
+        const p = {
+            riverBank: isDark ? '#64748b' : '#4b5563',
+            cityBank: isDark ? '#334155' : '#1e293b',
+            hwBank: isDark ? '#94a3b8' : '#64748b',
+            pier1: isDark ? '#64748b' : '#475569',
+            pier2: isDark ? '#475569' : '#334155',
+            beam: isDark ? '#f8fafc' : '#1f2937',
+            beamDraft: isDark ? '#cbd5e1' : '#9ca3af',
+            nodeFixed: isDark ? '#94a3b8' : '#111827',
+            nodeFree: isDark ? '#ffffff' : '#f3f4f6',
+            nodeBorder: isDark ? '#cbd5e1' : '#111827',
+            carBase: isDark ? '#cbd5e1' : '#1e293b',
+            carBox: isDark ? '#94a3b8' : '#374151',
+            wheel: isDark ? '#94a3b8' : '#111827'
+        };
+
         // Env
         if (currentLevel === 'river') {
-            ctx.fillStyle = '#4b5563';
+            ctx.fillStyle = p.riverBank;
             const rw = Math.min(canvas.width * 0.5, 500);
             const lX = (canvas.width - rw) / 2;
             ctx.fillRect(0, canvas.height * 0.6, lX, canvas.height * 0.4);
@@ -464,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fillStyle = '#3b82f6'; ctx.globalAlpha = 0.6;
             ctx.fillRect(lX, canvas.height * 0.8, rw, canvas.height * 0.2); ctx.globalAlpha = 1.0;
         } else if (currentLevel === 'city') {
-            ctx.fillStyle = '#1e293b';
+            ctx.fillStyle = p.cityBank;
             const gw = Math.min(canvas.width * 0.8, 800);
             const bX = (canvas.width - gw) / 2;
             ctx.fillRect(0, canvas.height * 0.4, bX, canvas.height * 0.6);
@@ -477,33 +538,35 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             ctx.globalAlpha = 1.0;
         } else if (currentLevel === 'highway') {
-            ctx.fillStyle = '#64748b'; // slate road banks
+            ctx.fillStyle = p.hwBank; // slate road banks
             const gw = Math.min(canvas.width * 0.7, 700);
             const bX = (canvas.width - gw) / 2;
             ctx.fillRect(0, canvas.height * 0.5, bX, canvas.height * 0.5);
             ctx.fillRect(bX + gw, canvas.height * 0.5, canvas.width, canvas.height * 0.5);
             
             // Draw Pier
-            ctx.fillStyle = '#475569';
+            ctx.fillStyle = p.pier1;
             ctx.fillRect(canvas.width / 2 - 30, canvas.height * 0.45, 60, canvas.height * 0.55);
-            ctx.fillStyle = '#334155';
+            ctx.fillStyle = p.pier2;
             ctx.fillRect(canvas.width / 2 - 20, canvas.height * 0.45, 40, canvas.height * 0.55);
         }
 
         if (draggingStartNode && !isSimulating) {
             ctx.beginPath();
             ctx.moveTo(draggingStartNode.x, draggingStartNode.y);
-            ctx.lineTo(mousePos.x, mousePos.y);
-            
             let currentDist = Math.hypot(mousePos.x - draggingStartNode.x, mousePos.y - draggingStartNode.y);
+            let drawX = mousePos.x;
+            let drawY = mousePos.y;
+
             if (currentDist > MAX_BEAM_LENGTH) {
-                ctx.strokeStyle = '#ef4444'; // Red if too long
-                ctx.setLineDash([]);
-            } else {
-                ctx.strokeStyle = '#9ca3af'; 
-                ctx.setLineDash([5, 5]);
+                let angle = Math.atan2(mousePos.y - draggingStartNode.y, mousePos.x - draggingStartNode.x);
+                drawX = draggingStartNode.x + Math.cos(angle) * MAX_BEAM_LENGTH;
+                drawY = draggingStartNode.y + Math.sin(angle) * MAX_BEAM_LENGTH;
             }
-            
+            ctx.lineTo(drawX, drawY);
+
+            ctx.strokeStyle = p.beamDraft; 
+            ctx.setLineDash([5, 5]);
             ctx.lineWidth = 2; 
             ctx.stroke(); ctx.setLineDash([]);
         }
@@ -514,21 +577,39 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.beginPath();
             ctx.moveTo(b.nodeA.x, b.nodeA.y);
             ctx.lineTo(b.nodeB.x, b.nodeB.y);
+            
+            let targetYield = b.size === 'light' ? 0.015 : (b.size === 'heavy' ? 0.05 : 0.03);
+            let stressPrc = Math.min(b.strain / targetYield, 1);
+            
             if(isSimulating) {
-                const stressPrc = Math.min(b.strain / YIELD_STRESS, 1);
                 ctx.strokeStyle = `rgb(${stressPrc * 255}, ${(1-stressPrc)*255}, 0)`;
             } else {
-                ctx.strokeStyle = hoveredBeam === b ? '#ef4444' : '#1f2937';
+                ctx.strokeStyle = hoveredBeam === b ? '#ef4444' : p.beam;
             }
-            ctx.lineWidth = 4;
+            
+            ctx.lineWidth = b.size === 'light' ? 2 : (b.size === 'heavy' ? 7 : 4);
             ctx.stroke();
+
+            // Draw Stress Numerical Value
+            if (isSimulating) {
+                let centerX = (b.nodeA.x + b.nodeB.x) / 2;
+                let centerY = (b.nodeA.y + b.nodeB.y) / 2;
+                ctx.font = 'bold 11px sans-serif';
+                ctx.fillStyle = stressPrc > 0.85 ? '#ff0000' : '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowColor = "black";
+                ctx.shadowBlur = 4;
+                ctx.fillText(`${(stressPrc * 100).toFixed(0)}%`, centerX, centerY - Math.max(10, ctx.lineWidth));
+                ctx.shadowBlur = 0; // Reset
+            }
         });
 
         // Draw Nodes
         nodes.forEach(n => {
             ctx.beginPath(); ctx.arc(n.x, n.y, n.fixed ? 6 : 4, 0, Math.PI * 2);
-            ctx.fillStyle = n.fixed ? '#111827' : (hoveredNode === n ? '#ef4444' : '#f3f4f6'); ctx.fill();
-            ctx.strokeStyle = '#111827'; ctx.lineWidth = n.fixed ? 2 : 1; ctx.stroke();
+            ctx.fillStyle = n.fixed ? p.nodeFixed : (hoveredNode === n ? '#ef4444' : p.nodeFree); ctx.fill();
+            ctx.strokeStyle = p.nodeBorder; ctx.lineWidth = n.fixed ? 2 : 1; ctx.stroke();
         });
 
         // Draw Custom Cargo Vehicle
@@ -547,7 +628,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Chassis Base
-            ctx.fillStyle = '#1e293b';
+            ctx.fillStyle = p.carBase;
             ctx.fillRect(car.x - 2, bounceY - 8, 42, 6);
             
             // Red Cab
@@ -557,7 +638,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fill();
             
             // Window
-            ctx.fillStyle = '#9ca3af';
+            ctx.fillStyle = p.beamDraft;
             ctx.fillRect(car.x + 28, bounceY - 20, 10, 8);
             
             // Headlight
@@ -565,7 +646,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fillRect(car.x + 38, bounceY - 10, 3, 4);
 
             // Cargo Box
-            ctx.fillStyle = '#374151';
+            ctx.fillStyle = p.carBox;
             ctx.fillRect(car.x, bounceY - 32, 24, 26);
             
             // Draw rotating wheels
@@ -573,11 +654,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.save();
                 ctx.translate(wx, wy);
                 ctx.rotate(rot);
-                ctx.fillStyle = '#111827';
+                ctx.fillStyle = p.wheel;
                 ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill();
-                ctx.fillStyle = '#9ca3af';
+                ctx.fillStyle = p.beamDraft;
                 ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI*2); ctx.fill();
-                ctx.strokeStyle = '#4b5563'; ctx.lineWidth = 1.5;
+                ctx.strokeStyle = p.nodeFixed; ctx.lineWidth = 1.5;
                 ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(0, 6); ctx.stroke();
                 ctx.restore();
@@ -586,7 +667,36 @@ document.addEventListener('DOMContentLoaded', () => {
             drawWheel(car.x + 6, car.y - 2, wheelRot);
             drawWheel(car.x + 32, car.y - 2, wheelRot);
         }
+
+        // Draw Coordinates if hovering
+        if (mousePos.x > 0 && mousePos.y > 0 && !isSimulating && operationMode !== 'delete') {
+            ctx.fillStyle = p.nodeFixed;
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.shadowColor = "rgba(0,0,0,0.5)";
+            ctx.shadowBlur = 4;
+            ctx.fillText(`(X: ${Math.round(mousePos.x)}, Y: ${Math.round(mousePos.y)})`, mousePos.x + 15, mousePos.y + 15);
+            ctx.shadowBlur = 0;
+        }
+
+        // Highlight failure point
+        if (firstBrokenBeam && car.state === 'failed') {
+            ctx.beginPath();
+            ctx.arc(brokeAtX, brokeAtY, 20, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            
+            ctx.beginPath(); ctx.moveTo(brokeAtX - 10, brokeAtY - 10); ctx.lineTo(brokeAtX + 10, brokeAtY + 10); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(brokeAtX + 10, brokeAtY - 10); ctx.lineTo(brokeAtX - 10, brokeAtY + 10); ctx.stroke();
+        }
     }
+
+    // React to theme changes to redraw instantly
+    const themeObserver = new MutationObserver(() => {
+        if (!isSimulating && nodes.length > 0) draw();
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
     function distToSegment(p, v, w) {
         let l2 = Math.pow(v.x - w.x, 2) + Math.pow(v.y - w.y, 2);
@@ -597,6 +707,41 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Buttons ---
+    document.getElementById('btn-save-checkpoint')?.addEventListener('click', () => {
+        if(isSimulating) return;
+        checkpointData.nodes = nodes.map(n => new Node(n.x, n.y, n.fixed));
+        checkpointData.beams = beams.map(b => ({
+            idxA: nodes.indexOf(b.nodeA),
+            idxB: nodes.indexOf(b.nodeB),
+            size: b.size
+        }));
+        showGameStatus(true, 'Checkpoint Saved!');
+        setTimeout(() => statusBanner.classList.add('hidden'), 2000);
+    });
+
+    document.getElementById('btn-restore-checkpoint')?.addEventListener('click', () => {
+        if (checkpointData.nodes.length === 0) {
+            showGameStatus(false, 'No checkpoint found!');
+            setTimeout(() => statusBanner.classList.add('hidden'), 2000);
+            return;
+        }
+        isSimulating = false;
+        if(animFrame) cancelAnimationFrame(animFrame);
+        car.active = false;
+        car.state = 'idle';
+        firstBrokenBeam = null;
+        statusBanner.classList.add('hidden');
+        
+        nodes = checkpointData.nodes.map(n => new Node(n.x, n.y, n.fixed));
+        beams = checkpointData.beams.map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size));
+        
+        car.x = nodes[0].x - 50; 
+        car.y = nodes[0].y - 15;
+        
+        updateBudgetUI();
+        draw();
+    });
+
     document.getElementById('btn-reset').addEventListener('click', () => {
         initEnvironment();
     });
