@@ -13,6 +13,8 @@
 [data-theme="dark"] {
     --bg-primary: #0a0a0a;
     --bg-secondary: #141414;
+    --bg-tertiary: #050505;
+    --bg-focus: rgba(3, 3, 3, 0.85);
     --bg-card: rgba(255, 255, 255, 0.03);
     --bg-glass: rgba(20, 20, 20, 0.7);
     --text-primary: #ffffff;
@@ -26,8 +28,10 @@
 }
 
 [data-theme="light"] {
-    --bg-primary: #f1f5f9;
+    --bg-primary: #ffffff;
     --bg-secondary: #e2e8f0;
+    --bg-tertiary: #cbd5e1;
+    --bg-focus: #cbd5e1;
     --bg-card: rgba(255, 255, 255, 0.95);
     --bg-glass: rgba(255, 255, 255, 0.65);
     --text-primary: #0f172a;
@@ -43,6 +47,8 @@
 [data-theme="vibrant"] {
     --bg-primary: #090014;
     --bg-secondary: #160436;
+    --bg-tertiary: #04000a;
+    --bg-focus: rgba(4, 0, 10, 0.85);
     --bg-card: rgba(255, 255, 255, 0.05);
     --bg-glass: rgba(22, 4, 54, 0.5);
     --text-primary: #ffffff;
@@ -84,6 +90,7 @@ a { text-decoration: none; color: inherit; }
 .section-title { font-size: clamp(2rem, 4vw, 3rem); margin-bottom: 2rem; }
 .center { text-align: center; }
 .mx-auto { margin: 0 auto !important; }
+.bg-secondary { background-color: var(--bg-secondary) !important; }
 .section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5rem; align-items: center; }
 .ml-auto { margin-left: auto; }
 
@@ -167,10 +174,11 @@ a { text-decoration: none; color: inherit; }
 .nav-item { font-weight: 600; font-size: 0.95rem; color: var(--text-primary); transition: color 0.3s; cursor: pointer; }
 .nav-item:hover { color: var(--accent); text-shadow: 0 0 10px var(--glow); }
 
-.theme-switcher { display: flex; gap: 0.5rem; background: var(--bg-primary); padding: 0.25rem; border-radius: 50px; border: 1px solid var(--border-color); }
-.theme-btn { background: transparent; border: none; font-size: 1.2rem; padding: 0.4rem; border-radius: 50%; opacity: 0.5; transition: 0.3s; cursor: pointer; }
+.theme-switcher { position: relative; display: flex; gap: 0.5rem; background: var(--bg-primary); padding: 0.25rem; border-radius: 50px; border: 1px solid var(--border-color); }
+.theme-slider { position: absolute; top: 0.25rem; left: 0; height: calc(100% - 0.5rem); background: var(--bg-glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 50px; box-shadow: 0 0 15px var(--glow); border: 1px solid var(--accent); transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.3s ease; z-index: 1; pointer-events: none; }
+.theme-btn { position: relative; z-index: 2; background: transparent !important; border: 1px solid transparent !important; box-shadow: none !important; font-size: 1.2rem; padding: 0.4rem; border-radius: 50%; opacity: 0.5; transition: 0.3s; cursor: pointer; }
 .theme-btn:hover { transform: scale(1.1); opacity: 0.8; }
-.theme-btn.active { background: var(--bg-secondary); opacity: 1; box-shadow: 0 0 15px var(--glow); border: 1px solid var(--accent); }
+.theme-btn.active { opacity: 1; }
 
 /* =========================================
    Hero Section
@@ -241,8 +249,6 @@ a { text-decoration: none; color: inherit; }
    About & Glassmorphism
 ========================================= */
 .image-wrapper { position: relative; width: 100%; padding-bottom: 120%; /* 5:6 Aspect */ }
-
-.image-wrapper { position: relative; width: 100%; padding-bottom: 120%; /* 5:6 Aspect */ }
 .glow-backdrop { position: absolute; top: 10%; left: 10%; right: -10%; bottom: -10%; background: var(--gradient-text); filter: blur(50px); opacity: 0.3; border-radius: var(--radius-lg); animation: pulseBG 4s ease infinite alternate; }
 .image-placeholder { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-glass); border: 1px solid var(--border-color); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); box-shadow: var(--card-shadow); }
 
@@ -268,8 +274,9 @@ a { text-decoration: none; color: inherit; }
 /* =========================================
    Portfolio & Expertise (Horizontal Scrub)
 ========================================= */
-.horizontal-section { height: 400vh; position: relative; z-index: 10; margin-top: 4rem; }
-.sticky-container { position: sticky; top: 0; min-height: 100vh; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-primary); overflow: hidden; }
+.horizontal-section { height: 400vh; position: relative; z-index: 10; margin-top: 0; }
+.sticky-container { position: sticky; top: 0; min-height: 100vh; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-primary); overflow: hidden; transition: background-color 1.2s cubic-bezier(0.16, 1, 0.3, 1), backdrop-filter 1.2s cubic-bezier(0.16, 1, 0.3, 1); backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
+.sticky-container.bg-focus { background-color: var(--bg-focus); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 .sticky-title { position: absolute; top: 15vh; left: 50%; transform: translateX(-50%); width: 100%; z-index: 5; }
 .horizontal-track { display: flex; gap: 3rem; padding: 0 calc(50vw - 200px); width: max-content; align-self: flex-start; will-change: transform; margin-top: 10vh; }
 .scroll-progress-container { position: absolute; bottom: 10vh; left: 20vw; width: 60vw; height: 4px; background: var(--border-color); border-radius: 4px; }
@@ -604,7 +611,7 @@ a { text-decoration: none; color: inherit; }
 [data-theme="light"] .contact-input { background: rgba(255,255,255,0.5); }
 .contact-input:focus { border-color: var(--accent); box-shadow: 0 0 15px var(--glow); }
 
-footer { padding: 4rem 0; border-top: 1px solid var(--border-color); background: var(--bg-secondary); }
+footer { padding: 4rem 0; border-top: 1px solid var(--border-color); background: var(--bg-tertiary); }
 .footer-content { display: flex; justify-content: space-between; align-items: center; }
 .social-links a { font-weight: 800; font-size: 1.2rem; background: var(--gradient-text); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; cursor: pointer; }
 

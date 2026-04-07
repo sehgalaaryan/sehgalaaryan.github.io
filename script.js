@@ -23,6 +23,7 @@ function initApp() {
     window.addEventListener('resize', debounce(() => {
         AnimationEngine.updateScrollScrub();
         AnimationEngine.updateHorizontalScroll();
+        ThemeManager.updateSlider();
     }, 150));
 }
 
@@ -32,9 +33,11 @@ function initApp() {
 const ThemeManager = {
     htmlEl: document.documentElement,
     btns: null,
+    slider: null,
 
     init() {
         this.btns = document.querySelectorAll('.theme-btn');
+        this.slider = document.getElementById('theme-slider');
         const savedTheme = localStorage.getItem('theme') || 'dark';
         this.setTheme(savedTheme);
 
@@ -43,13 +46,29 @@ const ThemeManager = {
                 this.setTheme(btn.getAttribute('data-theme-btn'));
             });
         });
+        
+        // Initial slider position after bounds settle
+        setTimeout(() => this.updateSlider(), 100);
     },
 
     setTheme(theme) {
         this.htmlEl.setAttribute('data-theme', theme);
         localStorage.setItem('theme', theme);
+        this.updateSlider();
+    },
+    
+    updateSlider() {
+        const theme = localStorage.getItem('theme') || 'dark';
         this.btns.forEach(btn => {
-            btn.classList.toggle('active', btn.getAttribute('data-theme-btn') === theme);
+            const isActive = btn.getAttribute('data-theme-btn') === theme;
+            btn.classList.toggle('active', isActive);
+            
+            if (isActive && this.slider) {
+                requestAnimationFrame(() => {
+                    this.slider.style.width = `${btn.offsetWidth}px`;
+                    this.slider.style.transform = `translateX(${btn.offsetLeft}px)`;
+                });
+            }
         });
     }
 };
@@ -185,10 +204,10 @@ const AnimationEngine = {
         const type = () => {
             const currentWord = words[wordIndex];
             if (isDeleting) {
-                typeTarget.innerText = currentWord.substring(0, charIndex - 1);
+                typeTarget.textContent = currentWord.substring(0, charIndex - 1);
                 charIndex--;
             } else {
-                typeTarget.innerText = currentWord.substring(0, charIndex + 1);
+                typeTarget.textContent = currentWord.substring(0, charIndex + 1);
                 charIndex++;
             }
 
@@ -262,6 +281,16 @@ const AnimationEngine = {
             
             track.style.transform = `translateX(${direction * progress * maxScrollDist}px)`;
             
+            // Background Dimming Animation
+            const stickyContainer = section.querySelector('.sticky-container');
+            if (stickyContainer) {
+                if (progress > 0.05 && progress < 0.95) {
+                    stickyContainer.classList.add('bg-focus');
+                } else {
+                    stickyContainer.classList.remove('bg-focus');
+                }
+            }
+            
             if (progressBar) {
                 progressBar.style.width = `${progress * 100}%`;
                 if (isReverse) {
@@ -331,8 +360,8 @@ const ProjectShowcase = {
         if (!this.lastCard) return;
 
         // 1. Prep Modal Content
-        document.getElementById('modal-title').innerText = title;
-        document.getElementById('modal-description').innerText = desc;
+        document.getElementById('modal-title').textContent = title;
+        document.getElementById('modal-description').textContent = desc;
         document.getElementById('modal-image').src = imgSrc;
 
         // 2. FIRST: Record Card Position
