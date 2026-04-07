@@ -10,8 +10,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusClose = document.getElementById('btn-status-close');
     
     function resizeCanvas() {
+        if (!canvas.parentElement) return;
         canvas.width = canvas.parentElement.clientWidth;
-        canvas.height = 500;
+        canvas.height = canvas.clientHeight || (canvas.width * 0.5);
         initEnvironment();
     }
     window.addEventListener('resize', resizeCanvas);
@@ -34,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let draggingStartNode = null;
     let mousePos = { x: 0, y: 0 };
     let snapRadius = 15;
+    let operationMode = 'build'; // 'build' or 'delete'
 
     // Physics constants
     const GRAVITY = 0.6;
@@ -138,16 +140,76 @@ document.addEventListener('DOMContentLoaded', () => {
 
     levelSelector.addEventListener('change', initEnvironment);
 
+    // --- Buttons & UI Logic ---
+    const modeToggleBtn = document.getElementById('btn-mode-toggle');
+    if (modeToggleBtn) {
+        modeToggleBtn.addEventListener('click', () => {
+            if (operationMode === 'build') {
+                operationMode = 'delete';
+                modeToggleBtn.innerHTML = '🗑️ Delete';
+                modeToggleBtn.classList.add('danger-btn');
+            } else {
+                operationMode = 'build';
+                modeToggleBtn.innerHTML = '🔨 Build';
+                modeToggleBtn.classList.remove('danger-btn');
+            }
+        });
+    }
+
+    const fullscreenBtn = document.getElementById('btn-fullscreen');
+    if (fullscreenBtn) {
+        fullscreenBtn.addEventListener('click', () => {
+            const container = document.querySelector('.game-container');
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (container.requestFullscreen) {
+                    container.requestFullscreen();
+                } else if (container.webkitRequestFullscreen) { /* Safari */
+                    container.webkitRequestFullscreen();
+                }
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) { /* Safari */
+                    document.webkitExitFullscreen();
+                }
+            }
+        });
+    }
+
+    document.addEventListener('fullscreenchange', () => setTimeout(resizeCanvas, 100));
+    document.addEventListener('webkitfullscreenchange', () => setTimeout(resizeCanvas, 100));
+
     // --- Interaction ---
-    canvas.addEventListener('mousemove', (e) => {
+    canvas.addEventListener('pointermove', (e) => {
         const rect = canvas.getBoundingClientRect();
-        mousePos.x = e.clientX - rect.left;
-        mousePos.y = e.clientY - rect.top;
+        let rawX = e.clientX - rect.left;
+        let rawY = e.clientY - rect.top;
+        
+        mousePos.x = rawX;
+        mousePos.y = rawY;
 
         if(!isSimulating) {
-            hoveredNode = nodes.find(n => Math.hypot(n.x - mousePos.x, n.y - mousePos.y) < snapRadius);
+            hoveredNode = nodes.find(n => Math.hypot(n.x - rawX, n.y - rawY) < snapRadius && n !== draggingStartNode);
+            
+            if (hoveredNode) {
+                mousePos.x = hoveredNode.x;
+                mousePos.y = hoveredNode.y;
+            } else if (draggingStartNode) {
+                // Ortho Snapping
+                let dx = rawX - draggingStartNode.x;
+                let dy = rawY - draggingStartNode.y;
+                let angle = Math.atan2(dy, dx);
+                const snapAngle = Math.PI / 4;
+                const nearestAngle = Math.round(angle / snapAngle) * snapAngle;
+                if (Math.abs(angle - nearestAngle) < 0.17) { // ~10 degrees tolerance
+                    let dist = Math.hypot(dx, dy);
+                    mousePos.x = draggingStartNode.x + Math.cos(nearestAngle) * dist;
+                    mousePos.y = draggingStartNode.y + Math.sin(nearestAngle) * dist;
+                }
+            }
+
             hoveredBeam = null;
-            if(!hoveredNode) {
+            if(!hoveredNode && !draggingStartNode) {
                 for(let beam of beams) {
                     const d = distToSegment(mousePos, beam.nodeA, beam.nodeB);
                     if(d < 5) {
@@ -160,18 +222,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    canvas.addEventListener('mousedown', (e) => {
+    canvas.addEventListener('pointerdown', (e) => {
         if(isSimulating) return;
-        if (e.button === 0) { 
+        
+        // Use pointer capture to keep receiving events even if the pointer moves outside the element slightly
+        canvas.setPointerCapture(e.pointerId);
+
+        const isDeleteAction = (e.button === 2) || (operationMode === 'delete');
+
+        if (!isDeleteAction && e.button === 0) { 
             if (hoveredNode) draggingStartNode = hoveredNode;
             else {
+                const rect = canvas.getBoundingClientRect();
+                mousePos.x = e.clientX - rect.left;
+                mousePos.y = e.clientY - rect.top;
                 const newNode = new Node(mousePos.x, mousePos.y, false);
                 nodes.push(newNode);
                 draggingStartNode = newNode;
                 hoveredNode = newNode;
             }
         } 
-        else if (e.button === 2) { 
+        else if (isDeleteAction) { 
             if (hoveredNode && !hoveredNode.fixed) {
                 beams = beams.filter(b => b.nodeA !== hoveredNode && b.nodeB !== hoveredNode);
                 nodes = nodes.filter(n => n !== hoveredNode);
@@ -185,8 +256,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    canvas.addEventListener('mouseup', (e) => {
-        if (e.button === 0 && draggingStartNode && !isSimulating) {
+    canvas.addEventListener('pointerup', (e) => {
+        canvas.releasePointerCapture(e.pointerId);
+        if (e.button === 0 && draggingStartNode && !isSimulating && operationMode !== 'delete') {
             let targetNode = hoveredNode;
             
             let dist = Math.hypot(mousePos.x - draggingStartNode.x, mousePos.y - draggingStartNode.y);
@@ -220,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    canvas.addEventListener('mouseleave', () => {
+    canvas.addEventListener('pointerleave', () => {
         draggingStartNode = null;
         if(!isSimulating) draw();
     });
@@ -335,23 +407,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Track Slope Calculation
                 if(currentBeam && car.x > 0 && car.x < targetRightX) {
-                    let dX = Math.abs(currentBeam.nodeB.x - currentBeam.nodeA.x);
-                    let leftNodeY = currentBeam.nodeA.x < currentBeam.nodeB.x ? currentBeam.nodeA.y : currentBeam.nodeB.y;
-                    let rightNodeY = currentBeam.nodeA.x < currentBeam.nodeB.x ? currentBeam.nodeB.y : currentBeam.nodeA.y;
-                    
-                    // + slope is uphill (right node is HIGHER visually on screen, meaning lower Y value)
-                    let slope = (leftNodeY - rightNodeY) / dX;
-
-                    if (slope > 0.45) { // Too steep uphill
-                        car.speed = 0; // Stall!
-                        car.state = 'failed';
-                        showGameStatus(false, 'Vehicle Stalled! The bridge shifted/sagged into a steep ditch (+24 deg). Build stronger trusses!');
-                    } else if (slope < -0.8) {
-                        car.speed = 0; // Nosedive crash
-                        car.state = 'failed';
-                        showGameStatus(false, 'Vehicle Crashed! The decline was too steep!');
-                    }
-
                     // Apply Heavy Weight Load
                     if(car.speed > 0) {
                         let totalDx = currentBeam.nodeB.x - currentBeam.nodeA.x;
@@ -478,17 +533,58 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Draw Custom Cargo Vehicle
         if (car.active || (!isSimulating && car.x > 0)) {
-            // Wheels
-            const wR = 5;
-            ctx.fillStyle = '#111827';
-            ctx.beginPath(); ctx.arc(car.x + 8, car.y - wR, wR, 0, Math.PI*2); ctx.fill();
-            ctx.beginPath(); ctx.arc(car.x + 32, car.y - wR, wR, 0, Math.PI*2); ctx.fill();
+            let wheelRot = car.x * 0.1; 
+            let bounceY = car.y + (car.active && car.speed > 0 ? Math.abs(Math.sin(car.x * 0.15)) * 1.5 : 0);
             
-            // Cargo Body
-            ctx.fillStyle = '#ef4444'; // Red cab
-            ctx.fillRect(car.x + 25, car.y - 20, 15, 15);
-            ctx.fillStyle = '#374151'; // Dark container
-            ctx.fillRect(car.x, car.y - 25, 24, 20);
+            // Draw Smoke
+            if (car.active && car.speed > 0) {
+                ctx.fillStyle = `rgba(150, 150, 150, 0.4)`;
+                ctx.beginPath();
+                ctx.arc(car.x - 15, car.y - 5 + Math.sin(car.x*0.5)*3, 6, 0, Math.PI*2);
+                ctx.fill();
+                ctx.arc(car.x - 22, car.y - 10 + Math.cos(car.x*0.4)*5, 10, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            // Chassis Base
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(car.x - 2, bounceY - 8, 42, 6);
+            
+            // Red Cab
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.roundRect(car.x + 22, bounceY - 24, 18, 18, 4);
+            ctx.fill();
+            
+            // Window
+            ctx.fillStyle = '#9ca3af';
+            ctx.fillRect(car.x + 28, bounceY - 20, 10, 8);
+            
+            // Headlight
+            ctx.fillStyle = '#eab308';
+            ctx.fillRect(car.x + 38, bounceY - 10, 3, 4);
+
+            // Cargo Box
+            ctx.fillStyle = '#374151';
+            ctx.fillRect(car.x, bounceY - 32, 24, 26);
+            
+            // Draw rotating wheels
+            const drawWheel = (wx, wy, rot) => {
+                ctx.save();
+                ctx.translate(wx, wy);
+                ctx.rotate(rot);
+                ctx.fillStyle = '#111827';
+                ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill();
+                ctx.fillStyle = '#9ca3af';
+                ctx.beginPath(); ctx.arc(0, 0, 2, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = '#4b5563'; ctx.lineWidth = 1.5;
+                ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(6, 0); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(0, 6); ctx.stroke();
+                ctx.restore();
+            };
+            
+            drawWheel(car.x + 6, car.y - 2, wheelRot);
+            drawWheel(car.x + 32, car.y - 2, wheelRot);
         }
     }
 

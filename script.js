@@ -61,23 +61,66 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // =========================================
-    // Typwriter Effect
+    // Touch Interaction Animation
+    // =========================================
+    document.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        const ripple = document.createElement('div');
+        ripple.className = 'touch-ripple';
+        ripple.style.left = `${touch.clientX}px`;
+        ripple.style.top = `${touch.clientY}px`;
+        ripple.style.transform = `translate(-50%, -50%) scale(0)`;
+        document.body.appendChild(ripple);
+
+        ripple.animate([
+            { transform: 'translate(-50%, -50%) scale(0)', opacity: 1 },
+            { transform: 'translate(-50%, -50%) scale(2)', opacity: 0 }
+        ], { duration: 600, easing: 'ease-out' }).onfinish = () => ripple.remove();
+    }, { passive: true });
+
+    // =========================================
+    // Typewriter Effect
     // =========================================
     const typeTarget = document.querySelector('.typewriter');
-    if(typeTarget) {
-        const fullText = typeTarget.getAttribute('data-text');
-        typeTarget.innerHTML = '';
-        let i = 0;
-        function typeWriter() {
-            if (i < fullText.length) {
-                typeTarget.innerHTML += fullText.charAt(i);
-                i++;
-                setTimeout(typeWriter, 50);
-            } else {
-                setTimeout(() => typeTarget.style.borderRight = 'transparent', 2000);
+    if (typeTarget) {
+        const wordsStr = typeTarget.getAttribute('data-words');
+        if (wordsStr) {
+            const words = JSON.parse(wordsStr);
+            let wordIndex = 0;
+            let charIndex = 0;
+            let isDeleting = false;
+
+            function typeWriter() {
+                const currentWord = words[wordIndex];
+
+                if (isDeleting) {
+                    typeTarget.innerHTML = currentWord.substring(0, charIndex - 1);
+                    charIndex--;
+                } else {
+                    typeTarget.innerHTML = currentWord.substring(0, charIndex + 1);
+                    charIndex++;
+                }
+
+                // Typing speed logic
+                let typeSpeed = isDeleting ? 30 : 60;
+
+                // Pause at the end of word
+                if (!isDeleting && charIndex === currentWord.length) {
+                    typeSpeed = 2000;
+                    isDeleting = true;
+                }
+                // Pause before typing next word
+                else if (isDeleting && charIndex === 0) {
+                    isDeleting = false;
+                    wordIndex = (wordIndex + 1) % words.length;
+                    typeSpeed = 400;
+                }
+
+                setTimeout(typeWriter, typeSpeed);
             }
+
+            setTimeout(typeWriter, 600);
         }
-        setTimeout(typeWriter, 600);
     }
 
     // =========================================
@@ -98,7 +141,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // Calculate how far the element is through the viewport
             // 0 = just entering bottom, 1 = leaving top, 0.5 = dead center
             let progress = 1 - (rect.top / windowHeight);
-            
+
             // Map progress to CSS properties
             const type = el.getAttribute('data-scrub-type');
 
@@ -107,7 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 let p = Math.max(0, Math.min(1, (progress - 0.1) * 2)); // 0 to 1 scaling rapidly
                 el.style.opacity = p;
                 el.style.transform = `translateY(${50 - (p * 50)}px)`;
-            } 
+            }
             else if (type === 'scale-up') {
                 // Pop scale and fade
                 let p = Math.max(0, Math.min(1, (progress - 0.1) * 2.5));
@@ -125,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Slide in slightly
                 let p = Math.max(0, Math.min(1, (progress - 0.1) * 2));
                 el.style.opacity = p;
-                el.style.transform = `translateY(${100 - (p * 100)}px) scale(${0.9 + (p*0.1)})`;
+                el.style.transform = `translateY(${100 - (p * 100)}px) scale(${0.9 + (p * 0.1)})`;
             }
             else if (type === 'hero') {
                 // Hero disappears as user scrolls down
@@ -147,7 +190,7 @@ document.addEventListener("DOMContentLoaded", () => {
             ticking = true;
         }
     });
-    
+
     // Initial trigger
     updateScrollScrub();
 
@@ -173,14 +216,14 @@ document.addEventListener("DOMContentLoaded", () => {
         document.querySelectorAll('.hover-3d').forEach(card => {
             card.addEventListener('mousemove', e => {
                 const rect = card.getBoundingClientRect();
-                const x = e.clientX - rect.left; 
-                const y = e.clientY - rect.top;  
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
                 const centerX = rect.width / 2;
                 const centerY = rect.height / 2;
-                
-                const rotateX = ((y - centerY) / centerY) * -10; 
+
+                const rotateX = ((y - centerY) / centerY) * -10;
                 const rotateY = ((x - centerX) / centerX) * 10;
-                
+
                 // Keep the scale/translateX scrub positioning but add 3D rotation
                 let currentTransform = card.style.transform || '';
                 // Clean old perspective/rotate/scale if any
@@ -195,8 +238,23 @@ document.addEventListener("DOMContentLoaded", () => {
             card.addEventListener('mouseleave', () => {
                 // Re-trigger global scrub to restore clean transform state
                 card.style.transition = 'transform 0.5s ease';
-                updateScrollScrub(); 
+                updateScrollScrub();
             });
+        });
+    }
+
+    // =========================================
+    // Contact Form Mailto Logic
+    // =========================================
+    const sendEmailBtn = document.getElementById('send-email-btn');
+    const contactMessage = document.getElementById('contact-message');
+
+    if (sendEmailBtn && contactMessage) {
+        sendEmailBtn.addEventListener('click', () => {
+            const message = encodeURIComponent(contactMessage.value || 'Hello Aaryan,');
+            const email = 'aaryan.sehgal.3070@gmail.com'; // TODO: User should change this to real email
+            const subject = encodeURIComponent('Inquiry from Portfolio');
+            window.location.href = `mailto:${email}?subject=${subject}&body=${message}`;
         });
     }
 });

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Portfolio of Aaryan Sehgal, a visionary Junior Bridge Designer with 3.5 years of experience in structural engineering and infrastructure.">
     <title>Aaryan Sehgal | Bridge Engineer</title>
     <!-- Google Fonts for modern typography -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,9 +52,9 @@
     <header class="hero scrub-target" id="home" data-scrub-type="hero">
         <div class="hero-content">
             <h2 class="subtitle">
-                <span class="typewriter" data-text="Dynamic Bridge Engineer | State-of-the-art Infrastructure"></span>
+                <span class="typewriter" data-words='["Dynamic Bridge Engineer", "State-of-the-art Infrastructure"]'></span>
             </h2>
-            <h1 class="title">Aaryan <span class="highlight animate-gradient-text">Sehgal</span></h1>
+            <h1 class="title">Aaryan <br class="mobile-break"><span class="highlight animate-gradient-text">Sehgal</span></h1>
             <p class="description">
                 I am a visionary Junior Bridge Designer at The Spannovation Group. Bringing 3.5 years of experience in orchestrating robust and breathtaking structural solutions.
             </p>
@@ -191,7 +192,7 @@
         </div>
     </section>
 
-    <!-- INteractive Game Section -->
+    <!-- Interactive Game Section -->
     <section id="game" class="section interactive-game-section scrub-target" data-scrub-type="scale-up">
         <div class="container">
             <h2 class="section-title center">Truss Builder <span class="highlight">Puzzle</span></h2>
@@ -209,8 +210,11 @@
                             <div class="budget-tracker">Budget: <span id="budget-display">$15,000</span></div>
                         </div>
                         <div class="game-hint hide-mobile">Left Click empty space to add anchor. Drag node-to-node to forge a steel beam (Costs $500 per meter). Right-click to refund/delete.</div>
+                        <div class="game-hint show-mobile">Touch empty space to add anchor. Drag to forge a beam. Switch to Delete mode to remove.</div>
                     </div>
                     <div class="game-actions flex-row gap-2">
+                        <button class="game-btn outline" id="btn-mode-toggle" title="Toggle Build/Delete Mode">🔨 Build</button>
+                        <button class="game-btn outline" id="btn-fullscreen" title="Toggle Fullscreen">🔲 Fullscreen</button>
                         <button class="game-btn simulate-btn" id="btn-simulate">▶️ Test Drive</button>
                         <button class="game-btn danger-btn" id="btn-reset">🔄 Reset Level</button>
                     </div>
@@ -233,7 +237,8 @@
             <h2 class="section-title">Get In <span class="highlight">Touch</span></h2>
             <div class="glass-card contact-card">
                 <p>Always open to discussing new structural challenges or design opportunities.</p>
-                <a href="mailto:your.email@example.com" class="btn primary btn-glow mt-4">Send an Email</a>
+                <textarea id="contact-message" class="contact-input" placeholder="Type your message here..." rows="4"></textarea>
+                <button id="send-email-btn" class="btn primary btn-glow">Send an Email</button>
             </div>
         </div>
     </section>
