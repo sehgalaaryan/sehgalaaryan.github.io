@@ -274,13 +274,13 @@ a { text-decoration: none; color: inherit; }
 .hero { min-height: 100svh; display: flex; align-items: center; justify-content: center; padding: calc(var(--nav-height) + 2rem) 5% 2rem; position: relative; z-index: 2; margin-top: 0; }
 .hero-container { display: flex; align-items: stretch; justify-content: space-between; width: 100%; max-width: 1200px; gap: clamp(2rem, 4vw, 4rem); }
 .hero-content { display: flex; flex-direction: column; justify-content: space-between; flex: 1 1 0; max-width: 650px; min-width: 0; }
-.hero-text-top { margin-bottom: 2rem; padding-inline: 2rem; }
+.hero-text-top { margin-bottom: 2rem; }
 
 .subtitle { font-family: var(--font-heading); font-style: italic; font-size: 1.5rem; color: var(--text-secondary); margin-top: 0; margin-bottom: 1rem; font-weight: 600; letter-spacing: 1px; min-height: 2rem; display: block; }
 .typewriter { border-right: 3px solid var(--accent); padding-right: 4px; white-space: pre-wrap; animation: blink 0.75s step-end infinite; }
 @keyframes blink { 50% { border-color: transparent; } }
 
-.title { font-size: clamp(3rem, 6vw, 6rem); margin-bottom: 1.5rem; white-space: nowrap; }
+.title { font-size: clamp(3.2rem, 9.5vw, 5.8rem); margin-bottom: 1.5rem; white-space: nowrap; width: 100%; }
 .mobile-break { display: none; }
 .highlight { background: var(--gradient-text); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .animate-gradient-text { animation: shine 4s linear infinite; }
