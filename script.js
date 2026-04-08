@@ -21,6 +21,7 @@ function initApp() {
 
     // Resize Handling
     window.addEventListener('resize', debounce(() => {
+        AnimationEngine.cacheSectionOffsets();
         AnimationEngine.updateScrollScrub();
         AnimationEngine.updateHorizontalScroll();
         ThemeManager.updateSlider();
@@ -163,11 +164,16 @@ const CursorManager = {
 const AnimationEngine = {
     scrubTargets: null,
     ticking: false,
+    lastScrollY: 0,
+    sectionOffsets: [],
 
     init() {
+        this.lastScrollY = window.scrollY;
         this.scrubTargets = document.querySelectorAll('.scrub-target');
+        this.cacheSectionOffsets();
         this.initTypewriter();
         this.init3DTilt();
+        this.initDescriptionScroll();
 
         window.addEventListener('scroll', () => {
             if (!this.ticking) {
@@ -184,11 +190,70 @@ const AnimationEngine = {
         this.updateScrollScrub();
     },
 
+    initDescriptionScroll() {
+        const container = document.querySelector('.description-container');
+        if (!container) return;
+
+        const updateMasks = () => {
+            const scrollTop = container.scrollTop;
+            const scrollHeight = container.scrollHeight;
+            const clientHeight = container.clientHeight;
+
+            // Top mask: appear when scrolled down
+            const topMask = Math.min(40, scrollTop);
+            container.style.setProperty('--top-mask', `${topMask}px`);
+
+            // Bottom mask: disappear when at bottom
+            const scrollBottom = scrollHeight - clientHeight - scrollTop;
+            const bottomMask = Math.max(0, Math.min(40, scrollBottom));
+            container.style.setProperty('--bottom-mask', `${bottomMask}px`);
+        };
+
+        container.addEventListener('scroll', updateMasks);
+        window.addEventListener('resize', updateMasks);
+        
+        // Initial call after a brief timeout to ensure layout is settled
+        setTimeout(updateMasks, 100);
+    },
+
+    cacheSectionOffsets() {
+        const sections = ['about', 'background', 'portfolio', 'expertise', 'puzzle', 'contact'];
+        this.sectionOffsets = sections.map(id => {
+            const el = document.getElementById(id);
+            return el ? { id, top: el.offsetTop } : null;
+        }).filter(s => s !== null);
+    },
+
     updateNavbar() {
         const navbar = document.querySelector('.navbar');
         if (!navbar) return;
+
+        // Scroll Direction tracking
+        const currentScroll = window.scrollY;
+        const scrollDirection = currentScroll > this.lastScrollY ? 'down' : 'up';
+        if (currentScroll !== this.lastScrollY) {
+            navbar.dataset.scrollDirection = scrollDirection;
+        }
+        this.lastScrollY = currentScroll;
+
         if (window.scrollY > 50) navbar.classList.add('scrolled');
         else navbar.classList.remove('scrolled');
+
+        // Optimized Scroll Spy
+        let currentSection = "";
+        const threshold = window.innerHeight * 0.4;
+        const scrollPos = window.scrollY + threshold;
+
+        for (const section of this.sectionOffsets) {
+            if (scrollPos >= section.top) {
+                currentSection = section.id;
+            }
+        }
+
+        const navLinks = document.querySelectorAll('.nav-item');
+        navLinks.forEach(link => {
+            link.classList.toggle('active', link.getAttribute('href') === `#${currentSection}`);
+        });
     },
 
     initTypewriter() {
@@ -245,10 +310,6 @@ const AnimationEngine = {
                 let p = Math.max(0, Math.min(1, (progress - 0.1) * 3));
                 el.style.opacity = p;
                 el.style.transform = `translateX(${-100 + (p * 100)}px)`;
-            } else if (type === 'slide-in') {
-                let p = Math.max(0, Math.min(1, (progress - 0.1) * 2));
-                el.style.opacity = p;
-                el.style.transform = `translateY(${100 - (p * 100)}px) scale(${0.9 + (p * 0.1)})`;
             } else if (type === 'hero') {
                 let p = Math.max(0, Math.min(1, window.scrollY / wh));
                 el.style.opacity = 1 - p;

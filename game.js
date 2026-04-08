@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let animFrame = null;
     let currentLevel = 'river';
 
-    // Game Economy Data
+    // Puzzle Economy Data
     let budget = 15000;
     let currentSpend = 0;
 
@@ -712,7 +712,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (car.x > levelState.bRightX + 20) {
                 car.state = 'passed';
                 isSimulating = false; // Stop the simulation loop
-                showGameStatus(true, 'Structural Integrity Confirmed! You Win!');
+                showPuzzleStatus(true, 'Structural Integrity Confirmed! You Win!');
             }
         }
 
@@ -723,7 +723,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function showGameStatus(isSuccess, message) {
+    function showPuzzleStatus(isSuccess, message) {
         statusBanner.className = 'game-status';
         statusBanner.classList.add(isSuccess ? 'success' : 'failure');
         statusText.innerText = message;

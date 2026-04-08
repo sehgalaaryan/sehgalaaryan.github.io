@@ -171,8 +171,29 @@ a { text-decoration: none; color: inherit; }
 .hamburger.active .line:nth-child(3) { transform: translateY(-9px) rotate(-45deg); background-color: var(--accent); }
 
 .nav-links { list-style: none; display: flex; gap: 2rem; align-items: center; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-.nav-item { font-weight: 600; font-size: 0.95rem; color: var(--text-primary); transition: color 0.3s; cursor: pointer; }
-.nav-item:hover { color: var(--accent); text-shadow: 0 0 10px var(--glow); }
+.nav-item { 
+    font-weight: 600; font-size: 0.95rem; color: var(--text-primary); transition: color 0.3s; cursor: pointer; 
+    position: relative;
+    padding: 0.2rem 0;
+}
+.nav-item::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 0 10px var(--glow);
+}
+.navbar[data-scroll-direction="up"] .nav-item::after {
+    transform-origin: right;
+}
+.nav-item:hover, .nav-item.active { color: var(--accent); text-shadow: 0 0 10px var(--glow); }
+.nav-item.active::after { transform: scaleX(1); }
 
 .theme-switcher { position: relative; display: flex; gap: 0.5rem; background: var(--bg-primary); padding: 0.25rem; border-radius: 50px; border: 1px solid var(--border-color); }
 .theme-slider { position: absolute; top: 0.25rem; left: 0; height: calc(100% - 0.5rem); background: var(--bg-glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 50px; box-shadow: 0 0 15px var(--glow); border: 1px solid var(--accent); transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.3s ease; z-index: 1; pointer-events: none; }
@@ -197,7 +218,39 @@ a { text-decoration: none; color: inherit; }
 .highlight { background: var(--gradient-text); background-size: 200% auto; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 .animate-gradient-text { animation: shine 4s linear infinite; }
 @keyframes shine { to { background-position: 200% center; } }
-.description { font-size: 1.15rem; color: var(--text-secondary); margin-bottom: 2.5rem; line-height: 1.8; }
+
+.description-container {
+    max-height: 280px;
+    overflow-y: auto;
+    position: relative;
+    padding-right: 15px;
+    margin-bottom: 0;
+    
+    /* Dynamic scroll mask variables */
+    --top-mask: 0px;
+    --bottom-mask: 50px;
+    mask-image: linear-gradient(to bottom, transparent 0, black var(--top-mask), black calc(100% - var(--bottom-mask)), transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, black var(--top-mask), black calc(100% - var(--bottom-mask)), transparent 100%);
+    
+    scrollbar-width: thin;
+    scrollbar-color: var(--accent) transparent;
+}
+
+/* Custom scrollbar for description */
+.description-container::-webkit-scrollbar {
+    width: 4px;
+    display: block;
+}
+.description-container::-webkit-scrollbar-thumb {
+    background: var(--accent);
+    border-radius: 10px;
+}
+.description-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.description { font-size: 1.15rem; color: var(--text-secondary); margin-bottom: 0; line-height: 1.8; }
+.text-max-width { max-width: 800px; }
 
 .cta-buttons { display: flex; gap: 1rem; }
 
@@ -256,10 +309,12 @@ a { text-decoration: none; color: inherit; }
 .glass-card p { color: var(--text-secondary); }
 
 /* Timeline & About Sticky Scroll */
-#about.section { overflow: visible; }
+#background.section { overflow: visible; }
 .about-grid { align-items: flex-start; }
-.about-sticky-side { position: sticky; top: 15vh; display: flex; flex-direction: column; gap: 2rem; }
-.about-scroll-side { padding-bottom: 5rem; }
+.about-sticky-side { position: sticky; top: 15vh; display: flex; flex-direction: column; gap: 2rem; padding-top: 0; }
+.about-sticky-side .section-title { margin-top: -12px; }
+.about-scroll-side { padding-bottom: 5rem; padding-top: 0; }
+.about-scroll-side .subsection-heading { margin-top: 0; }
 
 .experience-timeline { padding-left: 0; display: flex; flex-direction: column; gap: 1.5rem; }
 .timeline-item { display: grid; grid-template-columns: 40px 1fr; gap: 0.5rem; position: relative; }
@@ -275,6 +330,7 @@ a { text-decoration: none; color: inherit; }
    Portfolio & Expertise (Horizontal Scrub)
 ========================================= */
 .horizontal-section { height: 400vh; position: relative; z-index: 10; margin-top: 0; }
+.horizontal-section.short-scroll { height: 200vh; }
 .sticky-container { position: sticky; top: 0; min-height: 100vh; width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-primary); overflow: hidden; transition: background-color 1.2s cubic-bezier(0.16, 1, 0.3, 1), backdrop-filter 1.2s cubic-bezier(0.16, 1, 0.3, 1); backdrop-filter: blur(0px); -webkit-backdrop-filter: blur(0px); }
 .sticky-container.bg-focus { background-color: var(--bg-focus); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
 .sticky-title { position: absolute; top: 15vh; left: 50%; transform: translateX(-50%); width: 100%; z-index: 5; }

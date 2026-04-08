@@ -74,11 +74,11 @@
 
         <!-- Responsive Nav Links -->
         <ul class="nav-links" id="nav-menu">
-            <li><a href="#home" class="nav-item">Home</a></li>
             <li><a href="#about" class="nav-item">About</a></li>
-            <li><a href="#projects" class="nav-item">Projects</a></li>
-            <li><a href="#skills" class="nav-item">Skills</a></li>
-            <li><a href="#game" class="nav-item">Game</a></li>
+            <li><a href="#background" class="nav-item">Background</a></li>
+            <li><a href="#portfolio" class="nav-item">Portfolio</a></li>
+            <li><a href="#expertise" class="nav-item">Expertise</a></li>
+            <li><a href="#puzzle" class="nav-item">Puzzle</a></li>
             <li><a href="#contact" class="nav-item">Contact</a></li>
         </ul>
 
@@ -94,7 +94,7 @@
     </nav>
 
     <main>
-        <header class="hero scrub-target" id="home" data-scrub-type="hero">
+        <header class="hero scrub-target" id="about" data-scrub-type="hero">
             <div class="hero-container">
                 <div class="hero-content">
                     <div class="hero-text-top">
@@ -105,18 +105,33 @@
                         <h1 class="title">Aaryan <br class="mobile-break"><span
                                 class="highlight animate-gradient-text">Sehgal</span></h1>
                         <div class="glass-card">
-                            <p class="description">
-                                Dedicated Bridge Engineer with 3.5+ years of experience at The Spannovation Group,
-                                specializing in complex design and Finite Element Analysis-(FEA). Expert in PSC, Steel,
-                                and
-                                RCC bridge structures, ensuring technical excellence across IRC, AASHTO, and Eurocode
-                                standards. Committed to engineering resilient, high-performance infrastructure through
-                                advanced computational modeling and innovative design methodologies.
-                            </p>
+                            <div class="description-container">
+                                <p class="description">
+                                    Dedicated Bridge Engineer with 3.5+ years of experience at The Spannovation Group,
+                                    specializing in complex design and Finite Element Analysis (FEA). Expert in PSC, Steel,
+                                    and RCC bridge structures, ensuring technical excellence across IRC, AASHTO, and
+                                    Eurocode standards. Committed to engineering resilient, high-performance
+                                    infrastructure through advanced computational modeling and innovative design
+                                    methodologies.
+                                    <br><br>
+                                    My professional journey is defined by a passion for structural integrity and a
+                                    meticulous approach to large-scale infrastructure projects. From the initial
+                                    conceptualization to the final implementation of seismic-resilient designs, I
+                                    prioritize safety, sustainability, and aesthetic harmony in all my engineering
+                                    endeavors. I am constantly exploring the intersection of cutting-edge technology and
+                                    traditional engineering principles to push the boundaries of what's possible in
+                                    modern bridge design.
+                                    <br><br>
+                                    Whether it's optimizing the load path of a complex suspension bridge or conducting
+                                    thorough wind tunnel simulations for urban viaducts, my goal is always to deliver
+                                    structures that stand the test of time and provide a robust foundation for future
+                                    generations.
+                                </p>
+                            </div>
                         </div>
                     </div>
                     <div class="cta-buttons">
-                        <a href="#projects" class="btn primary btn-glow">View Projects</a>
+                        <a href="#portfolio" class="btn primary btn-glow">View Portfolio</a>
                         <a href="resume.pdf" class="btn outline hover-lift" download>Download CV</a>
                         <a href="#contact" class="btn outline hover-lift">Contact</a>
                     </div>
@@ -149,12 +164,12 @@
                 </div>
             </div>
         </div>
-        <section id="about" class="section scrub-target" data-scrub-type="fade-up">
+        <section id="background" class="section scrub-target" data-scrub-type="fade-up">
             <div class="container section-grid about-grid">
 
                 <!-- Sticky Left Column -->
-                <div class="about-sticky-side" style="padding-top: 0;">
-                    <h2 class="section-title" style="margin-top: -12px;">Engineering Resilient <span
+                <div class="about-sticky-side">
+                    <h2 class="section-title">Engineering Resilient <span
                             class="highlight">Infrastructure</span></h2>
                     <div class="hero-graphic">
                         <div class="floating-shape shape-orb"></div>
@@ -169,8 +184,8 @@
                 </div>
 
                 <!-- Scrollable Right Column -->
-                <div class="about-scroll-side" style="padding-top: 0;">
-                    <h3 class="subsection-heading" style="margin-top: 0;">Experience &amp; Education</h3>
+                <div class="about-scroll-side">
+                    <h3 class="subsection-heading">Experience &amp; Education</h3>
                     <div class="experience-timeline">
                         <!-- Item 1 -->
                         <div class="timeline-item scrub-target" data-scrub-type="slide-left">
@@ -252,7 +267,7 @@
         </section>
 
         <!-- Projects Section -->
-        <section id="projects" class="horizontal-section">
+        <section id="portfolio" class="horizontal-section">
             <div class="sticky-container">
                 <h2 class="section-title center sticky-title">Professional <span class="highlight">Portfolio</span></h2>
 
@@ -320,7 +335,7 @@
             </div>
         </section>
 
-        <section id="skills" class="horizontal-section" style="height: 200vh;">
+        <section id="expertise" class="horizontal-section short-scroll">
             <div class="sticky-container">
                 <h2 class="section-title center sticky-title">Technical <span class="highlight">Expertise</span></h2>
 
@@ -359,10 +374,10 @@
         </section>
 
         <!-- Interactive Game Section -->
-        <section id="game" class="section interactive-game-section scrub-target" data-scrub-type="scale-up">
+        <section id="puzzle" class="section interactive-game-section scrub-target" data-scrub-type="scale-up">
             <div class="container">
                 <h2 class="section-title center">Truss Builder <span class="highlight">Puzzle</span></h2>
-                <p class="center text-secondary mb-4 mx-auto" style="max-width: 800px;">
+                <p class="center text-secondary mb-4 mx-auto text-max-width">
                     Step into the shoes of a structural engineer! Design and optimize a bridge truss system to safely
                     carry
                     heavy dynamic loads across the gap. Balance your budget, manage material efficiency, and test your
@@ -398,7 +413,7 @@
                             </div>
                             <div class="game-hint hide-mobile">
                                 <div class="game-hint-inner">
-                                    <div class="game-hint-icon">
+                                    <div class="game-hint-icon" aria-hidden="true">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
                                             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                                             stroke-linecap="round" stroke-linejoin="round">
@@ -419,7 +434,7 @@
                             </div>
                             <div class="game-hint show-mobile">
                                 <div class="game-hint-inner">
-                                    <div class="game-hint-icon">
+                                    <div class="game-hint-icon" aria-hidden="true">
                                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"
                                             viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                                             stroke-linecap="round" stroke-linejoin="round">
