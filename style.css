@@ -491,10 +491,10 @@ a { text-decoration: none; color: inherit; }
     background: rgba(59, 130, 246, 0.1);
 }
 
-/* Mobile-only Game Buttons */
-@media (min-width: 1025px) {
+/* Mobile-only Game Buttons - DEPRECATED: Mode toggle now universal */
+/* @media (min-width: 1025px) {
     #btn-mode-toggle { display: none !important; }
-}
+} */
 
 /* Fullscreen adjustments */
 .game-container:fullscreen,
@@ -539,6 +539,9 @@ a { text-decoration: none; color: inherit; }
 .game-status.hidden { display: none; }
 .game-status.success { border-color: #10b981; box-shadow: 0 0 30px rgba(16, 185, 129, 0.3); }
 .game-status.failure { border-color: #ef4444; box-shadow: 0 0 30px rgba(239, 68, 68, 0.3); }
+.game-status .cta-buttons { display: flex; gap: 0.8rem; margin-top: 0.5rem; }
+.game-status #btn-status-help { border-color: #eab308; color: #eab308; }
+.game-status #btn-status-help:hover { background: rgba(234, 179, 8, 0.15); }
 
 .bridge-canvas { width: 100%; aspect-ratio: 2 / 1; max-height: 65vh; display: block; background: #87CEEB; cursor: crosshair !important; pointer-events: auto; touch-action: none; }
 [data-theme="dark"] .bridge-canvas { background: #1a232f; }

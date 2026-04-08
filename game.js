@@ -44,17 +44,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let draggingStartNode = null;
     let mousePos = { x: 0, y: 0 };
     let snapRadius = 15;
-    let operationMode = 'build'; // 'build' or 'delete'
+    let operationMode = 'road'; // 'road', 'truss', or 'delete'
+    let helpBlueprint = null; // Stores pedagogical ghost lines
 
     // Physics constants
     const GRAVITY = 0.6;
     const RELAXATION_ITERATIONS = 50;
-    const MAX_BEAM_LENGTH = 140; // Max allowed distance to draw a beam
+    const MAX_BEAM_LENGTH = 125; // Rebalanced from 140 to force trussing
 
     const MATERIAL_CONFIG = {
-        light: { cost: 3, yield: 0.015, color: 'light' },
-        standard: { cost: 5, yield: 0.03, color: 'standard' },
-        heavy: { cost: 8, yield: 0.05, color: 'heavy' }
+        road: { cost: 5, yield: 0.02, color: 'road' },
+        light: { cost: 3, yield: 0.012, color: 'light' },
+        standard: { cost: 5, yield: 0.02, color: 'standard' },
+        heavy: { cost: 20, yield: 0.06, color: 'heavy' } // Cost increase for balance
     };
 
     let themePalette = {};
@@ -141,11 +143,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // cannot overwrite a valid design checkpoint.
         if (!simulating && car.state === 'failed') {
             const saveBtn = document.getElementById('btn-save-checkpoint');
+            const simBtn = document.getElementById('btn-simulate');
             if (saveBtn) {
                 saveBtn.disabled = true;
                 saveBtn.style.opacity = '0.4';
                 saveBtn.style.pointerEvents = 'none';
                 saveBtn.title = 'Cannot save — structure has collapsed';
+            }
+            if (simBtn) {
+                 simBtn.disabled = true;
+                 simBtn.style.opacity = '0.4';
+                 simBtn.style.pointerEvents = 'none';
             }
         } else if (!simulating) {
             // Restore tooltips/states when simulation is properly exited
@@ -179,6 +187,257 @@ document.addEventListener('DOMContentLoaded', () => {
     let redoStack = [];
     const MAX_HISTORY = 50;
 
+    const LEVEL_SOLUTIONS = {
+        river: [
+            {
+                // Variation 1: 5-Panel Standard Warren (Optimized for 50% stress)
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true}, // 0,1
+                    {relX: 0.2, relY: 0, fixed: false}, {relX: 0.4, relY: 0, fixed: false},
+                    {relX: 0.6, relY: 0, fixed: false}, {relX: 0.8, relY: 0, fixed: false}, // 2-5 (Road)
+                    {relX: 0.1, relY: -0.12, fixed: false}, {relX: 0.3, relY: -0.15, fixed: false},
+                    {relX: 0.5, relY: -0.15, fixed: false}, {relX: 0.7, relY: -0.15, fixed: false},
+                    {relX: 0.9, relY: -0.12, fixed: false} // 6-10 (Truss)
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'standard', isRoad: true}, {idxA: 2, idxB: 3, size: 'standard', isRoad: true}, {idxA: 3, idxB: 4, size: 'standard', isRoad: true}, {idxA: 4, idxB: 5, size: 'standard', isRoad: true}, {idxA: 5, idxB: 1, size: 'standard', isRoad: true},
+                    {idxA: 0, idxB: 6, size: 'standard'}, {idxA: 6, idxB: 2, size: 'light'}, {idxA: 6, idxB: 7, size: 'standard'}, {idxA: 7, idxB: 3, size: 'light'}, {idxA: 7, idxB: 8, size: 'standard'}, {idxA: 8, idxB: 4, size: 'light'}, {idxA: 8, idxB: 9, size: 'standard'}, {idxA: 9, idxB: 5, size: 'light'}, {idxA: 9, idxB: 10, size: 'standard'}, {idxA: 10, idxB: 1, size: 'standard'}
+                ]
+            },
+            {
+                // Variation 2: Under-chord Warren (50% stress target)
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.25, relY: 0, fixed: false}, {relX: 0.5, relY: 0, fixed: false}, {relX: 0.75, relY: 0, fixed: false},
+                    {relX: 0.12, relY: 0.12, fixed: false}, {relX: 0.37, relY: 0.15, fixed: false}, {relX: 0.63, relY: 0.15, fixed: false}, {relX: 0.88, relY: 0.12, fixed: false}
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'standard', isRoad: true}, {idxA: 2, idxB: 3, size: 'standard', isRoad: true}, {idxA: 3, idxB: 4, size: 'standard', isRoad: true}, {idxA: 4, idxB: 1, size: 'standard', isRoad: true},
+                    {idxA: 0, idxB: 5, size: 'standard'}, {idxA: 5, idxB: 2, size: 'light'}, {idxA: 2, idxB: 6, size: 'standard'}, {idxA: 6, idxB: 3, size: 'light'}, {idxA: 3, idxB: 7, size: 'standard'}, {idxA: 7, idxB: 4, size: 'light'}, {idxA: 4, idxB: 8, size: 'standard'}, {idxA: 8, idxB: 1, size: 'standard'},
+                    {idxA: 5, idxB: 6, size: 'light'}, {idxA: 6, idxB: 7, size: 'light'}, {idxA: 7, idxB: 8, size: 'light'}
+                ]
+            },
+            {
+                // Variation 3: Deep Pratt (Standard/Light Mix)
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.2, relY: 0, fixed: false}, {relX: 0.4, relY: 0, fixed: false}, {relX: 0.6, relY: 0, fixed: false}, {relX: 0.8, relY: 0, fixed: false},
+                    {relX: 0.2, relY: -0.15, fixed: false}, {relX: 0.4, relY: -0.15, fixed: false}, {relX: 0.6, relY: -0.15, fixed: false}, {relX: 0.8, relY: -0.15, fixed: false}
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'standard', isRoad: true}, {idxA: 2, idxB: 3, size: 'standard', isRoad: true}, {idxA: 3, idxB: 4, size: 'standard', isRoad: true}, {idxA: 4, idxB: 5, size: 'standard', isRoad: true}, {idxA: 5, idxB: 1, size: 'standard', isRoad: true},
+                    {idxA: 0, idxB: 6, size: 'standard'}, {idxA: 6, idxB: 7, size: 'standard'}, {idxA: 7, idxB: 8, size: 'standard'}, {idxA: 8, idxB: 9, size: 'standard'}, {idxA: 9, idxB: 1, size: 'standard'},
+                    {idxA: 6, idxB: 2, size: 'light'}, {idxA: 7, idxB: 3, size: 'light'}, {idxA: 8, idxB: 4, size: 'light'}, {idxA: 9, idxB: 5, size: 'light'},
+                    {idxA: 0, idxB: 7, size: 'light'}, {idxA: 3, idxB: 9, size: 'light'}, {idxA: 4, idxB: 1, size: 'light'}
+                ]
+            }
+        ],
+        city: [
+            {
+                // Variation 1: 8-Panel Deck Truss (Mixed Material)
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.125, relY: 0, fixed: false}, {relX: 0.25, relY: 0, fixed: false}, 
+                    {relX: 0.375, relY: 0, fixed: false}, {relX: 0.5, relY: 0, fixed: false},
+                    {relX: 0.625, relY: 0, fixed: false}, {relX: 0.75, relY: 0, fixed: false},
+                    {relX: 0.875, relY: 0, fixed: false},
+                    {relX: 0.125, relY: 0.15, fixed: false}, {relX: 0.375, relY: 0.15, fixed: false}, 
+                    {relX: 0.625, relY: 0.15, fixed: false}, {relX: 0.875, relY: 0.15, fixed: false}
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 6, size: 'heavy', isRoad: true}, {idxA: 6, idxB: 7, size: 'heavy', isRoad: true}, {idxA: 7, idxB: 8, size: 'heavy', isRoad: true}, {idxA: 8, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 0, idxB: 9, size: 'standard'}, {idxA: 9, idxB: 3, size: 'standard'}, {idxA: 3, idxB: 10, size: 'standard'}, {idxA: 10, idxB: 5, size: 'standard'}, {idxA: 5, idxB: 11, size: 'standard'}, {idxA: 11, idxB: 7, size: 'standard'}, {idxA: 7, idxB: 12, size: 'standard'}, {idxA: 12, idxB: 1, size: 'standard'},
+                    {idxA: 9, idxB: 10, size: 'light'}, {idxA: 10, idxB: 11, size: 'light'}, {idxA: 11, idxB: 12, size: 'light'}
+                ]
+            },
+            {
+                // Variation 2: Cable-braced Suspension (Optimized)
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.2, relY: 0, fixed: false}, {relX: 0.4, relY: 0, fixed: false}, {relX: 0.6, relY: 0, fixed: false}, {relX: 0.8, relY: 0, fixed: false},
+                    {relX: 0.2, relY: -0.2, fixed: false}, {relX: 0.8, relY: -0.2, fixed: false}
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 0, idxB: 6, size: 'standard'}, {idxA: 1, idxB: 7, size: 'standard'}, {idxA: 6, idxB: 2, size: 'standard'}, {idxA: 6, idxB: 3, size: 'standard'}, {idxA: 7, idxB: 4, size: 'standard'}, {idxA: 7, idxB: 3, size: 'standard'}, {idxA: 6, idxB: 7, size: 'light'}
+                ]
+            },
+            {
+                // Variation 3: 10-Panel Under-arch
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.2, relY: 0, fixed: false}, {relX: 0.4, relY: 0, fixed: false}, {relX: 0.6, relY: 0, fixed: false}, {relX: 0.8, relY: 0, fixed: false},
+                    {relX: 0.3, relY: 0.2, fixed: false}, {relX: 0.5, relY: 0.25, fixed: false}, {relX: 0.7, relY: 0.2, fixed: false}
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 0, idxB: 6, size: 'standard'}, {idxA: 6, idxB: 7, size: 'standard'}, {idxA: 7, idxB: 8, size: 'standard'}, {idxA: 8, idxB: 1, size: 'standard'},
+                    {idxA: 6, idxB: 2, size: 'light'}, {idxA: 7, idxB: 3, size: 'light'}, {idxA: 8, idxB: 4, size: 'light'}
+                ]
+            }
+        ],
+        highway: [
+            {
+                // Variation 1: 10-Panel Warren (50% stress, aligned anchors)
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true}, // 0,1
+                    {relX: 0.1, relY: 0, fixed: false}, {relX: 0.2, relY: 0, fixed: false}, 
+                    {relX: 0.3, relY: 0, fixed: false}, {relX: 0.4, relY: 0, fixed: false},
+                    {relX: 0.5, relY: 0, fixed: false}, {relX: 0.6, relY: 0, fixed: false},
+                    {relX: 0.7, relY: 0, fixed: false}, {relX: 0.8, relY: 0, fixed: false},
+                    {relX: 0.9, relY: 0, fixed: false}, // 2-10 (Road)
+                    {relX: 0.05, relY: -0.15, fixed: false}, {relX: 0.25, relY: -0.15, fixed: false},
+                    {relX: 0.5, relY: -0.2, fixed: false}, {relX: 0.75, relY: -0.15, fixed: false},
+                    {relX: 0.95, relY: -0.15, fixed: false} // 11-15 (Truss)
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 6, size: 'heavy', isRoad: true}, {idxA: 6, idxB: 7, size: 'heavy', isRoad: true}, {idxA: 7, idxB: 8, size: 'heavy', isRoad: true}, {idxA: 8, idxB: 9, size: 'heavy', isRoad: true}, {idxA: 9, idxB: 10, size: 'heavy', isRoad: true}, {idxA: 10, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 0, idxB: 11, size: 'standard'}, {idxA: 11, idxB: 3, size: 'standard'}, {idxA: 3, idxB: 12, size: 'standard'}, {idxA: 12, idxB: 5, size: 'standard'}, {idxA: 5, idxB: 13, size: 'standard'}, {idxA: 13, idxB: 7, size: 'standard'}, {idxA: 7, idxB: 14, size: 'standard'}, {idxA: 14, idxB: 9, size: 'standard'}, {idxA: 9, idxB: 15, size: 'standard'}, {idxA: 15, idxB: 1, size: 'standard'},
+                    {idxA: 11, idxB: 12, size: 'standard'}, {idxA: 12, idxB: 13, size: 'standard'}, {idxA: 13, idxB: 14, size: 'standard'}, {idxA: 14, idxB: 15, size: 'standard'}
+                ]
+            },
+            {
+                // Variation 2: Pylon-anchored Deck Truss
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.1, relY: 0, fixed: false}, {relX: 0.2, relY: 0, fixed: false}, 
+                    {relX: 0.3, relY: 0, fixed: false}, {relX: 0.4, relY: 0, fixed: false},
+                    {relX: 0.5, relY: 0, fixed: false}, {relX: 0.6, relY: 0, fixed: false},
+                    {relX: 0.7, relY: 0, fixed: false}, {relX: 0.8, relY: 0, fixed: false},
+                    {relX: 0.9, relY: 0, fixed: false},
+                    {relX: 0.457, relY: -0.07, fixed: true}, {relX: 0.543, relY: -0.07, fixed: true} // Aligned with internal pylon tops
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 6, size: 'heavy', isRoad: true}, {idxA: 6, idxB: 7, size: 'heavy', isRoad: true}, {idxA: 7, idxB: 8, size: 'heavy', isRoad: true}, {idxA: 8, idxB: 9, size: 'heavy', isRoad: true}, {idxA: 9, idxB: 10, size: 'heavy', isRoad: true}, {idxA: 10, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 11, idxB: 4, size: 'standard'}, {idxA: 11, idxB: 5, size: 'standard'}, {idxA: 11, idxB: 6, size: 'standard'}, 
+                    {idxA: 12, idxB: 6, size: 'standard'}, {idxA: 12, idxB: 7, size: 'standard'}, {idxA: 12, idxB: 8, size: 'standard'}
+                ]
+            },
+            {
+                // Variation 3: Deep Cable-stayed Space Hub
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.2, relY: 0, fixed: false}, {relX: 0.4, relY: 0, fixed: false}, 
+                    {relX: 0.6, relY: 0, fixed: false}, {relX: 0.8, relY: 0, fixed: false},
+                    {relX: 0.5, relY: -0.3, fixed: false},
+                    {relX: 0.457, relY: -0.07, fixed: true}, {relX: 0.543, relY: -0.07, fixed: true}
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 6, idxB: 7, size: 'heavy'}, {idxA: 6, idxB: 8, size: 'heavy'},
+                    {idxA: 6, idxB: 0, size: 'standard'}, {idxA: 6, idxB: 2, size: 'standard'}, {idxA: 6, idxB: 3, size: 'standard'}, {idxA: 6, idxB: 4, size: 'standard'}, {idxA: 6, idxB: 5, size: 'standard'}, {idxA: 6, idxB: 1, size: 'standard'}
+                ]
+            }
+        ],
+        pylons: [
+            {
+                // Variation 1: 12-Panel Triple-Span Warren (Pinned to 6 anchorage nodes)
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.1, relY: 0, fixed: false}, {relX: 0.2, relY: 0, fixed: false}, 
+                    {relX: 0.3, relY: 0, fixed: false}, {relX: 0.4, relY: 0, fixed: false},
+                    {relX: 0.5, relY: 0, fixed: false}, {relX: 0.6, relY: 0, fixed: false},
+                    {relX: 0.7, relY: 0, fixed: false}, {relX: 0.8, relY: 0, fixed: false},
+                    {relX: 0.9, relY: 0, fixed: false},
+                    // Aligned Pylon Anchors
+                    {relX: 0.297, relY: 0.045, fixed: true}, {relX: 0.363, relY: 0.045, fixed: true},
+                    {relX: 0.627, relY: 0.045, fixed: true}, {relX: 0.693, relY: 0.045, fixed: true}
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 6, size: 'heavy', isRoad: true}, {idxA: 6, idxB: 7, size: 'heavy', isRoad: true}, {idxA: 7, idxB: 8, size: 'heavy', isRoad: true}, {idxA: 8, idxB: 9, size: 'heavy', isRoad: true}, {idxA: 9, idxB: 10, size: 'heavy', isRoad: true}, {idxA: 10, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 11, idxB: 3, size: 'standard'}, {idxA: 11, idxB: 4, size: 'standard'}, {idxA: 12, idxB: 5, size: 'standard'}, {idxA: 12, idxB: 6, size: 'standard'},
+                    {idxA: 13, idxB: 7, size: 'standard'}, {idxA: 13, idxB: 8, size: 'standard'}, {idxA: 14, idxB: 9, size: 'standard'}, {idxA: 14, idxB: 10, size: 'standard'},
+                    {idxA: 11, idxB: 12, size: 'standard'}, {idxA: 13, idxB: 14, size: 'standard'}
+                ]
+            },
+            {
+                // Variation 2: Heavy Deck Under-arch Cable Support
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.1, relY: 0, fixed: false}, {relX: 0.25, relY: 0, fixed: false}, {relX: 0.4, relY: 0, fixed: false}, {relX: 0.6, relY: 0, fixed: false}, {relX: 0.75, relY: 0, fixed: false}, {relX: 0.9, relY: 0, fixed: false},
+                    {relX: 0.297, relY: 0.045, fixed: true}, {relX: 0.693, relY: 0.045, fixed: true},
+                    {relX: 0.297, relY: 0.25, fixed: false}, {relX: 0.693, relY: 0.25, fixed: false}
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 6, size: 'heavy', isRoad: true}, {idxA: 6, idxB: 7, size: 'heavy', isRoad: true}, {idxA: 7, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 8, idxB: 10, size: 'heavy'}, {idxA: 9, idxB: 11, size: 'heavy'},
+                    {idxA: 10, idxB: 2, size: 'standard'}, {idxA: 10, idxB: 3, size: 'standard'}, {idxA: 10, idxB: 4, size: 'standard'},
+                    {idxA: 11, idxB: 5, size: 'standard'}, {idxA: 11, idxB: 6, size: 'standard'}, {idxA: 11, idxB: 7, size: 'standard'},
+                    {idxA: 10, idxB: 11, size: 'light'}
+                ]
+            },
+            {
+                // Variation 3: Deep Pratt Space Truss (Pinned)
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.1, relY: 0, fixed: false}, {relX: 0.2, relY: 0, fixed: false}, {relX: 0.3, relY: 0, fixed: false}, {relX: 0.4, relY: 0, fixed: false}, {relX: 0.5, relY: 0, fixed: false}, {relX: 0.6, relY: 0, fixed: false}, {relX: 0.7, relY: 0, fixed: false}, {relX: 0.8, relY: 0, fixed: false}, {relX: 0.9, relY: 0, fixed: false},
+                    {relX: 0.33, relY: -0.2, fixed: false}, {relX: 0.66, relY: -0.2, fixed: false},
+                    {relX: 0.363, relY: 0.045, fixed: true}, {relX: 0.627, relY: 0.045, fixed: true}
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 6, size: 'heavy', isRoad: true}, {idxA: 6, idxB: 7, size: 'heavy', isRoad: true}, {idxA: 7, idxB: 8, size: 'heavy', isRoad: true}, {idxA: 8, idxB: 9, size: 'heavy', isRoad: true}, {idxA: 9, idxB: 10, size: 'heavy', isRoad: true}, {idxA: 10, idxB: 12, size: 'heavy', isRoad: true}, {idxA: 12, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 0, idxB: 11, size: 'standard'}, {idxA: 11, idxB: 13, size: 'standard'}, {idxA: 13, idxB: 14, size: 'standard'}, {idxA: 14, idxB: 12, size: 'standard'}, {idxA: 12, idxB: 1, size: 'standard'},
+                    {idxA: 11, idxB: 4, size: 'light'}, {idxA: 14, idxB: 9, size: 'light'}
+                ]
+            }
+        ],
+        mountain: [
+            {
+                // Variation 1: 8-Panel Sloped Warren (50% stress target)
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true}, // 0,1
+                    {relX: 0.125, relY: 0.05, fixed: false}, {relX: 0.25, relY: 0.1, fixed: false}, 
+                    {relX: 0.375, relY: 0.15, fixed: false}, {relX: 0.5, relY: 0.2, fixed: false},
+                    {relX: 0.625, relY: 0.25, fixed: false}, {relX: 0.75, relY: 0.3, fixed: false},
+                    {relX: 0.875, relY: 0.35, fixed: false}, // 2-8
+                    {relX: 0.05, relY: -0.1, fixed: false}, {relX: 0.25, relY: -0.1, fixed: false},
+                    {relX: 0.5, relY: -0.05, fixed: false}, {relX: 0.75, relY: 0.1, fixed: false},
+                    {relX: 0.95, relY: 0.2, fixed: false} // 9-13
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 6, size: 'heavy', isRoad: true}, {idxA: 6, idxB: 7, size: 'heavy', isRoad: true}, {idxA: 7, idxB: 8, size: 'heavy', isRoad: true}, {idxA: 8, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 0, idxB: 9, size: 'standard'}, {idxA: 9, idxB: 3, size: 'standard'}, {idxA: 3, idxB: 10, size: 'standard'}, {idxA: 10, idxB: 5, size: 'standard'}, {idxA: 5, idxB: 11, size: 'standard'}, {idxA: 11, idxB: 7, size: 'standard'}, {idxA: 7, idxB: 12, size: 'standard'}, {idxA: 12, idxB: 1, size: 'standard'},
+                    {idxA: 9, idxB: 10, size: 'standard'}, {idxA: 10, idxB: 11, size: 'standard'}, {idxA: 11, idxB: 12, size: 'standard'}, {idxA: 12, idxB: 13, size: 'standard'}
+                ]
+            },
+            {
+                // Variation 2: Deep Anchor Cable-suspension
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.2, relY: 0.08, fixed: false}, {relX: 0.4, relY: 0.16, fixed: false}, {relX: 0.6, relY: 0.24, fixed: false}, {relX: 0.8, relY: 0.32, fixed: false},
+                    {relX: 0.1, relY: -0.3, fixed: false}, {relX: 0.9, relY: 0.2, fixed: false}
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 0, idxB: 6, size: 'heavy'}, {idxA: 1, idxB: 7, size: 'heavy'},
+                    {idxA: 6, idxB: 2, size: 'standard'}, {idxA: 6, idxB: 3, size: 'standard'}, {idxA: 6, idxB: 4, size: 'standard'},
+                    {idxA: 7, idxB: 4, size: 'standard'}, {idxA: 7, idxB: 5, size: 'standard'}, {idxA: 6, idxB: 7, size: 'light'}
+                ]
+            },
+            {
+                // Variation 3: Zig-zag Sloped Foundation Truss
+                nodes: [
+                    {relX: 0, relY: 0, fixed: true}, {relX: 1, relY: 0, fixed: true},
+                    {relX: 0.2, relY: 0.08, fixed: false}, {relX: 0.4, relY: 0.16, fixed: false}, {relX: 0.6, relY: 0.24, fixed: false}, {relX: 0.8, relY: 0.32, fixed: false},
+                    {relX: 0.3, relY: 0.4, fixed: false}, {relX: 0.7, relY: 0.6, fixed: false}
+                ],
+                beams: [
+                    {idxA: 0, idxB: 2, size: 'heavy', isRoad: true}, {idxA: 2, idxB: 3, size: 'heavy', isRoad: true}, {idxA: 3, idxB: 4, size: 'heavy', isRoad: true}, {idxA: 4, idxB: 5, size: 'heavy', isRoad: true}, {idxA: 5, idxB: 1, size: 'heavy', isRoad: true},
+                    {idxA: 0, idxB: 6, size: 'standard'}, {idxA: 6, idxB: 3, size: 'standard'}, {idxA: 3, idxB: 7, size: 'standard'}, {idxA: 7, idxB: 1, size: 'standard'},
+                    {idxA: 6, idxB: 7, size: 'light'}
+                ]
+            }
+        ]
+    };
+
+    function onDesignChange() {
+        if (!isSimulating && car.state === 'failed') {
+            car.state = 'idle'; // Transition out of failed state to enable UI
+            setSimulatingUI(false);
+            draw();
+        }
+    }
+
     function saveHistory() {
         if (isSimulating) return;
         const snapshot = {
@@ -186,7 +445,8 @@ document.addEventListener('DOMContentLoaded', () => {
             beams: beams.map(b => ({
                 idxA: nodes.indexOf(b.nodeA),
                 idxB: nodes.indexOf(b.nodeB),
-                size: b.size
+                size: b.size,
+                isRoad: !!b.isRoad
             }))
         };
         undoStack.push(snapshot);
@@ -200,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Guard against stale indices (-1) that can occur after level switches
         beams = snapshot.beams
             .filter(b => b.idxA >= 0 && b.idxB >= 0 && b.idxA < nodes.length && b.idxB < nodes.length)
-            .map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size));
+            .map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size, !!b.isRoad));
         updateBudgetUI();
         draw();
     }
@@ -225,7 +485,8 @@ document.addEventListener('DOMContentLoaded', () => {
             beams: beams.map(b => ({
                 idxA: nodes.indexOf(b.nodeA),
                 idxB: nodes.indexOf(b.nodeB),
-                size: b.size
+                size: b.size,
+                isRoad: !!b.isRoad
             }))
         };
         redoStack.push(current);
@@ -241,7 +502,8 @@ document.addEventListener('DOMContentLoaded', () => {
             beams: beams.map(b => ({
                 idxA: nodes.indexOf(b.nodeA),
                 idxB: nodes.indexOf(b.nodeB),
-                size: b.size
+                size: b.size,
+                isRoad: !!b.isRoad
             }))
         };
         undoStack.push(current);
@@ -293,7 +555,8 @@ document.addEventListener('DOMContentLoaded', () => {
             beams: beams.map(b => ({
                 idxA: nodes.indexOf(b.nodeA),
                 idxB: nodes.indexOf(b.nodeB),
-                size: b.size
+                size: b.size,
+                isRoad: !!b.isRoad
             }))
         };
         saveToPersistentStorage(currentLevel, design);
@@ -329,7 +592,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         beams = design.beams
             .filter(b => b.idxA >= 0 && b.idxB >= 0 && b.idxA < nodes.length && b.idxB < nodes.length)
-            .map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size));
+            .map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size, !!b.isRoad));
         
         resetVehicleToStart();
         
@@ -358,11 +621,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     class Beam {
-        constructor(nodeA, nodeB, size) {
+        constructor(nodeA, nodeB, size, isRoad = false) {
             this.nodeA = nodeA; this.nodeB = nodeB;
             this.length = Math.hypot(nodeB.x - nodeA.x, nodeB.y - nodeA.y);
             this.strain = 0; this.broken = false;
             this.size = size || 'standard';
+            this.isRoad = isRoad;
         }
     }
 
@@ -389,6 +653,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nodes = [];
         beams = [];
         ghostStructure = null;
+        helpBlueprint = null; // Clear pedagogical lines on reset/restore
         isSimulating = false;
         car.active = false;
         car.state = 'idle';
@@ -416,18 +681,18 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (currentLevel === 'river') {
             budget = 15000;
-            levelState.gapWidth = Math.min(canvas.width * 0.5, 500);
+            levelState.gapWidth = Math.min(canvas.width * 0.45, 400);
             levelState.bLeftX = (canvas.width - levelState.gapWidth) / 2;
             levelState.bRightX = levelState.bLeftX + levelState.gapWidth;
             levelState.bankY = canvas.height * 0.6;
             levelState.isAsymmetric = false;
-
+            
             nodes.push(new Node(levelState.bLeftX, levelState.bankY, true));
             nodes.push(new Node(levelState.bLeftX, levelState.bankY + 50, true));
             nodes.push(new Node(levelState.bRightX, levelState.bankY, true));
             nodes.push(new Node(levelState.bRightX, levelState.bankY + 50, true));
         } else if (currentLevel === 'city') {
-            budget = 25000;
+            budget = 22000;
             levelState.gapWidth = Math.min(canvas.width * 0.8, 800);
             levelState.bLeftX = (canvas.width - levelState.gapWidth) / 2;
             levelState.bRightX = levelState.bLeftX + levelState.gapWidth;
@@ -439,7 +704,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes.push(new Node(levelState.bRightX, levelState.bankY, true));
             nodes.push(new Node(levelState.bRightX, levelState.bankY + 80, true));
         } else if (currentLevel === 'highway') {
-            budget = 20000;
+            budget = 30000;
             levelState.gapWidth = Math.min(canvas.width * 0.7, 700);
             levelState.bLeftX = (canvas.width - levelState.gapWidth) / 2;
             levelState.bRightX = levelState.bLeftX + levelState.gapWidth;
@@ -457,7 +722,7 @@ document.addEventListener('DOMContentLoaded', () => {
             nodes.push(new Node(pX - 30, canvas.height * 0.6, true));
             nodes.push(new Node(pX + 30, canvas.height * 0.6, true));
         } else if (currentLevel === 'pylons') {
-            budget = 18000;
+            budget = 40000;
             levelState.gapWidth = Math.min(canvas.width * 0.85, 900);
             levelState.bLeftX = (canvas.width - levelState.gapWidth) / 2;
             levelState.bRightX = levelState.bLeftX + levelState.gapWidth;
@@ -478,7 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 nodes.push(new Node(px + 15, levelState.bankY + 120, true));
             });
         } else if (currentLevel === 'mountain') {
-            budget = 30000;
+            budget = 42000;
             levelState.gapWidth = Math.min(canvas.width * 0.7, 750);
             levelState.bLeftX = (canvas.width - levelState.gapWidth) / 2;
             levelState.bRightX = levelState.bLeftX + levelState.gapWidth;
@@ -613,14 +878,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modeToggleBtn) {
         modeToggleBtn.addEventListener('click', () => {
             const span = modeToggleBtn.querySelector('span');
-            if (operationMode === 'build') {
+            // Cycle: Road -> Truss -> Delete
+            if (operationMode === 'road') {
+                operationMode = 'truss';
+                if (span) span.innerText = 'Truss';
+                modeToggleBtn.classList.remove('danger-btn');
+                modeToggleBtn.style.color = 'var(--accent)';
+            } else if (operationMode === 'truss') {
                 operationMode = 'delete';
                 if (span) span.innerText = 'Delete';
                 modeToggleBtn.classList.add('danger-btn');
+                modeToggleBtn.style.color = '#ef4444';
             } else {
-                operationMode = 'build';
-                if (span) span.innerText = 'Build';
+                operationMode = 'road';
+                if (span) span.innerText = 'Road';
                 modeToggleBtn.classList.remove('danger-btn');
+                modeToggleBtn.style.color = 'var(--text-primary)';
             }
         });
     }
@@ -655,9 +928,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const container = document.querySelector('.game-container');
             const entering = !document.fullscreenElement && !document.webkitFullscreenElement;
 
-            // ① Fade to black first (overlay is inside game-container so it's always visible)
+            // ① Snapshot structure IMMEDIATELY before layout shifts
+            const snapshot = {
+                freeNodeRels: nodes.filter(n => !n.fixed).map(n => {
+                    const relX = levelState.gapWidth > 0 ? (n.x - levelState.bLeftX) / levelState.gapWidth : 0;
+                    const bankYAtX = levelState.isAsymmetric ? levelState.bankY + relX * (levelState.bankYRight - levelState.bankY) : levelState.bankY;
+                    const relY = levelState.gapWidth > 0 ? (n.y - bankYAtX) / levelState.gapWidth : 0;
+                    return { relX, relY };
+                }),
+                beamDefs: beams.map(b => ({
+                    idxA: nodes.indexOf(b.nodeA),
+                    idxB: nodes.indexOf(b.nodeB),
+                    size: b.size,
+                    isRoad: b.isRoad
+                }))
+            };
+            window._fsSnapshot = snapshot;
+
+            // ② Fade out and switch mode
             animateOverlay(true, () => {
-                // ② While screen is dark — switch fullscreen mode
                 if (entering) {
                     const req = container.requestFullscreen
                         ? container.requestFullscreen()
@@ -690,47 +979,39 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const toggleFsText = () => {
+        const entering = !!(document.fullscreenElement || document.webkitFullscreenElement);
         const span = fullscreenBtn ? fullscreenBtn.querySelector('span') : null;
-        if (span) {
-            span.innerText = (document.fullscreenElement || document.webkitFullscreenElement) ? 'Exit' : 'Full';
-        }
+        if (span) span.innerText = entering ? 'Exit' : 'Full';
 
-        // Wait for CSS layout to settle after the fullscreen switch
+        // snapshot relative state IMMEDIATELY before layout settles
+        const structuralSnapshot = {
+            freeNodeRels: nodes.filter(n => !n.fixed).map(n => {
+                const relX = levelState.gapWidth > 0 ? (n.x - levelState.bLeftX) / levelState.gapWidth : 0;
+                const bankYAtX = levelState.isAsymmetric ? levelState.bankY + relX * (levelState.bankYRight - levelState.bankY) : levelState.bankY;
+                const relY = levelState.gapWidth > 0 ? (n.y - bankYAtX) / levelState.gapWidth : 0;
+                return { relX, relY };
+            }),
+            beamDefs: beams.map(b => ({
+                idxA: nodes.indexOf(b.nodeA),
+                idxB: nodes.indexOf(b.nodeB),
+                size: b.size,
+                isRoad: b.isRoad
+            }))
+        };
+
+        // Wait for CSS/Browser layout to settle
         setTimeout(() => {
             if (!canvas.parentElement) {
                 animateOverlay(false, () => { isFullscreenTransitioning = false; });
                 return;
             }
 
-            // AUTO-RESET ON FAILURE: If entering/exiting FS during a crash, clear the wreckage.
+            // AUTO-RESET ON FAILURE
             if (car.state === 'failed' || car.state === 'passed') {
-                initEnvironment(true); // This resets physics, clears wreckage, and restores design
+                initEnvironment(true); 
             }
 
-            // ── Step 1: Snapshot user structure in level-relative coords ──
-            const freeNodeRels = nodes
-                .filter(n => !n.fixed)
-                .map(n => {
-                    const relX = levelState.gapWidth > 0
-                        ? (n.x - levelState.bLeftX) / levelState.gapWidth : 0;
-                    const bankYAtX = levelState.isAsymmetric
-                        ? levelState.bankY + relX * (levelState.bankYRight - levelState.bankY)
-                        : levelState.bankY;
-                    const relY = levelState.gapWidth > 0
-                        ? (n.y - bankYAtX) / levelState.gapWidth : 0;
-                    return { relX, relY };
-                });
-
-            const beamDefs = beams.map(b => ({
-                idxA: nodes.indexOf(b.nodeA),
-                idxB: nodes.indexOf(b.nodeB),
-                size: b.size
-            }));
-
-            // ── Step 2: Compute new canvas pixel dimensions reliably ──
-            // Read from the CONTAINER dimensions minus the UI toolbar height.
-            // This avoids any canvas self-sizing quirk (height:0, aspect-ratio, etc.)
-            // that can make canvas.getBoundingClientRect().height return 0.
+            // Compute new canvas dimensions reliably from container
             const uiBar = canvas.parentElement.querySelector('.game-ui');
             const uiH  = uiBar ? uiBar.offsetHeight : 0;
             const newW = canvas.parentElement.clientWidth  || window.innerWidth;
@@ -739,32 +1020,29 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.width  = Math.max(newW, 1);
             canvas.height = Math.max(newH, 1);
 
-            // ── Step 3: Re-init so levelState recalculates for the new size ──
+            // Re-init recalibrates levelState (gapWidth, bLeftX, bankY) for new size
             initEnvironment();
 
-            // ── Step 4: Re-inject free nodes at scaled absolute positions ──
-            freeNodeRels.forEach(nr => {
-                const bankYAtX = levelState.isAsymmetric
-                    ? levelState.bankY + nr.relX * (levelState.bankYRight - levelState.bankY)
-                    : levelState.bankY;
+            // Restore structure from snapshot using the new environmental coordinates
+            structuralSnapshot.freeNodeRels.forEach(nr => {
+                const bankYAtX = levelState.isAsymmetric ? levelState.bankY + nr.relX * (levelState.bankYRight - levelState.bankY) : levelState.bankY;
                 const absX = levelState.bLeftX + nr.relX * levelState.gapWidth;
                 const absY = bankYAtX + nr.relY * levelState.gapWidth;
                 nodes.push(new Node(absX, absY, false));
             });
 
-            // ── Step 5: Restore beams via stable index mapping ──
-            beams = beamDefs
-                .filter(b => b.idxA >= 0 && b.idxB >= 0
-                          && b.idxA < nodes.length && b.idxB < nodes.length)
-                .map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size));
+            beams = structuralSnapshot.beamDefs
+                .filter(b => b.idxA >= 0 && b.idxB >= 0 && b.idxA < nodes.length && b.idxB < nodes.length)
+                .map(b => {
+                    const beam = new Beam(nodes[b.idxA], nodes[b.idxB], b.size);
+                    beam.isRoad = !!b.isRoad;
+                    return beam;
+                });
 
             updateBudgetUI();
             draw();
-
-            // ③ Fade back in revealing the correctly rescaled game
             animateOverlay(false, () => { isFullscreenTransitioning = false; });
-
-        }, 200); // 200ms: safe margin for CSS flex layout to resolve after fullscreenchange
+        }, 250);
     };
     document.addEventListener('fullscreenchange', toggleFsText);
     document.addEventListener('webkitfullscreenchange', toggleFsText);
@@ -831,10 +1109,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (hoveredNode) {
                 // Starting drag from existing node — save history now so undo reverts the upcoming beam
                 saveHistory();
+                onDesignChange();
                 draggingStartNode = hoveredNode;
             } else {
                 // Creating a brand new node + potentially a beam — save history before both
                 saveHistory();
+                onDesignChange();
                 const rect = canvas.getBoundingClientRect();
                 mousePos.x = e.clientX - rect.left;
                 mousePos.y = e.clientY - rect.top;
@@ -847,11 +1127,13 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (isDeleteAction) { 
             if (hoveredNode && !hoveredNode.fixed) {
                 saveHistory();
+                onDesignChange();
                 beams = beams.filter(b => b.nodeA !== hoveredNode && b.nodeB !== hoveredNode);
                 nodes = nodes.filter(n => n !== hoveredNode);
                 hoveredNode = null;
             } else if (hoveredBeam) {
                 saveHistory();
+                onDesignChange();
                 beams = beams.filter(b => b !== hoveredBeam);
                 hoveredBeam = null;
             }
@@ -892,8 +1174,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     );
                     if(!exists) {
                         // No saveHistory here — it was already called in pointerdown
-                        const beamSize = document.getElementById('beam-size-selector') ? document.getElementById('beam-size-selector').value : 'standard';
-                        beams.push(new Beam(draggingStartNode, targetNode, beamSize));
+                        const beamSize = (operationMode === 'road') ? 'road' : (document.getElementById('beam-size-selector') ? document.getElementById('beam-size-selector').value : 'standard');
+                        beams.push(new Beam(draggingStartNode, targetNode, beamSize, operationMode === 'road'));
                         updateBudgetUI();
                     }
                 }
@@ -987,42 +1269,66 @@ document.addEventListener('DOMContentLoaded', () => {
         if (car.active && car.state === 'driving') {
             car.x += car.speed;
             
-            // Find track: The highest solid beam segment physically spanning car's X coordinate
+            // Find track: Prefer the track (beam or ground) physically spanning car's X coordinate 
+            // that is closest to the car's current elevation (car.y+10).
             let trackY = null;
             let currentBeam = null;
+            let minDiff = Infinity;
+            const carBottom = car.y + 10;
             
+            // Check all solid beams - ONLY Road beams can be driveable track
             beams.forEach(b => {
-                if (b.broken) return;
+                if (b.broken || !b.isRoad) return;
                 let minX = Math.min(b.nodeA.x, b.nodeB.x);
                 let maxX = Math.max(b.nodeA.x, b.nodeB.x);
                 
                 // Add tiny buffer so car doesn't fall through connecting joints
                 if (car.x >= minX - 1 && car.x <= maxX + 1) {
-                    // interpolate Y at car.x
+                    let yAtX;
                     let t = (car.x - b.nodeA.x) / (b.nodeB.x - b.nodeA.x);
                     if (Number.isFinite(t)) {
-                        let yAtX = b.nodeA.y + t * (b.nodeB.y - b.nodeA.y);
-                        // We want the highest track (minimum Y in canvas coords)
-                        if (trackY === null || yAtX < trackY) {
-                            trackY = yAtX;
-                            currentBeam = b;
-                        }
-                    } else if (car.x === b.nodeA.x) {
-                         let maxY = Math.min(b.nodeA.y, b.nodeB.y);
-                         if (trackY === null || maxY < trackY) {
-                            trackY = maxY;
-                         }
+                        yAtX = b.nodeA.y + t * (b.nodeB.y - b.nodeA.y);
+                    } else {
+                        yAtX = Math.min(b.nodeA.y, b.nodeB.y);
+                    }
+                    
+                    let diff = Math.abs(yAtX - carBottom);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        trackY = yAtX;
+                        currentBeam = b;
                     }
                 }
             });
 
-            // Is the car on the ground banks? (Outside the gap area)
-            if(car.x <= levelState.bLeftX || car.x >= levelState.bRightX) {
-                if (currentLevel === 'mountain') {
-                    trackY = (car.x <= levelState.bLeftX) ? levelState.bankY : levelState.bankYRight;
-                } else {
-                    trackY = levelState.bankY;
+            // Check Ground Surfaces (Banks and Pylons)
+            const checkGround = (gy, rangeStart, rangeEnd) => {
+                if (car.x >= rangeStart && car.x <= rangeEnd) {
+                    let diff = Math.abs(gy - carBottom);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        trackY = gy;
+                        currentBeam = null;
+                    }
                 }
+            };
+
+            // Main Banks (Ground)
+            checkGround(levelState.bankY, -1000, levelState.bLeftX);
+            if (currentLevel === 'mountain') {
+                checkGround(levelState.bankYRight, levelState.bRightX, canvas.width + 1000);
+            } else {
+                checkGround(levelState.bankY, levelState.bRightX, canvas.width + 1000);
+            }
+
+            // Industrial Pylons (Levels 3 & 4) - Register tops as solid ground
+            if (currentLevel === 'highway') {
+                const pX = canvas.width / 2;
+                checkGround(canvas.height * 0.45, pX - 55, pX + 55);
+            } else if (currentLevel === 'pylons') {
+                const p1X = levelState.bLeftX + levelState.gapWidth * 0.33;
+                const p2X = levelState.bLeftX + levelState.gapWidth * 0.66;
+                [p1X, p2X].forEach(px => checkGround(levelState.bankY + 40, px - 35, px + 35));
             }
 
             if (trackY !== null) {
@@ -1038,7 +1344,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if(car.speed > 0) {
                         let totalDx = currentBeam.nodeB.x - currentBeam.nodeA.x;
                         let tPrc = totalDx !== 0 ? (car.x - currentBeam.nodeA.x) / totalDx : 0.5;
-                        let load = GRAVITY * 18.0; // Slightly increased for impact
+                        let load = GRAVITY * 7.5; // Calibrated for structural challenge (mandatory trussing)
                         
                         if (!currentBeam.nodeA.fixed) currentBeam.nodeA.y += load * (1 - tPrc);
                         if (!currentBeam.nodeB.fixed) currentBeam.nodeB.y += load * tPrc;
@@ -1060,7 +1366,7 @@ document.addEventListener('DOMContentLoaded', () => {
             } else if (car.state === 'driving' && car.y > canvas.height) {
                 // First time falling below screen
                 car.state = 'failed';
-                let failReason = firstBrokenBeam ? `Beam snapped at ${Math.round(brokeStrain * 100)}% strain!` : 'Catastrophic Structural Failure! The vehicle fell.';
+                let failReason = firstBrokenBeam ? `Beam snapped at ${(brokeStrain * 100).toFixed(0)}% stress!` : 'Catastrophic Structural Failure! The vehicle fell.';
                 showPuzzleStatus(false, failReason);
                 // Keep UI DISABLED until explicitly closed or reset
             } else if (car.state === 'driving' && car.x > levelState.bRightX + 20) {
@@ -1083,13 +1389,52 @@ document.addEventListener('DOMContentLoaded', () => {
         statusBanner.className = 'game-status';
         statusBanner.classList.add(isSuccess ? 'success' : 'failure');
         statusText.innerText = message;
+        
+        const helpBtn = document.getElementById('btn-status-help');
+        if (helpBtn) {
+            helpBtn.style.display = (!isSuccess && LEVEL_SOLUTIONS[currentLevel]?.length > 0) ? 'block' : 'none';
+        }
     }
+
+    document.getElementById('btn-status-help')?.addEventListener('click', () => {
+        const solutions = LEVEL_SOLUTIONS[currentLevel];
+        if (solutions && solutions.length > 0) {
+            const randomSol = solutions[Math.floor(Math.random() * solutions.length)];
+            
+            // pedagogical mode: don't auto-solve, just projection ghost blueprint
+            statusBanner.classList.add('hidden');
+
+            const solNodes = randomSol.nodes.map(n => {
+                let absX = levelState.bLeftX + (n.relX * levelState.gapWidth);
+                let bankYAtX = levelState.isAsymmetric 
+                    ? levelState.bankY + n.relX * (levelState.bankYRight - levelState.bankY)
+                    : levelState.bankY;
+                let absY = bankYAtX + (n.relY * levelState.gapWidth);
+                return { x: absX, y: absY };
+            });
+
+            helpBlueprint = {
+                nodes: solNodes,
+                beams: randomSol.beams.map(b => ({
+                    nodeA: solNodes[b.idxA],
+                    nodeB: solNodes[b.idxB]
+                }))
+            };
+            
+            if (window.showToast) window.showToast('Blueprint displayed! Trace the ghost lines.', 'success');
+            
+            isSimulating = false;
+            onDesignChange();
+            draw();
+        }
+    });
 
     statusClose.addEventListener('click', () => {
         statusBanner.classList.add('hidden');
         if (car.state === 'failed') {
-            // Re-enable UI so the user can BUILD while the debris settled/X pulses.
-            // We KEEP isSimulating=true so the 'draw' loop continues rendering the pulse.
+            // Re-enable UI so the user can BUILD (or delete), 
+            // but the Run button will stay disabled (managed in setSimulatingUI) 
+            // until they make a change.
             setSimulatingUI(false);
         } else if (car.state === 'passed') {
             isSimulating = false;
@@ -1288,6 +1633,29 @@ document.addEventListener('DOMContentLoaded', () => {
             drawPeak(levelState.bRightX - rightW * 0.05, levelState.bankYRight - canvas.height * 0.18, rightW * 0.50, p.mtnColor, 0.85);
             drawPeak(levelState.bRightX + rightW * 0.35, levelState.bankYRight - canvas.height * 0.10, rightW * 0.70, p.mtnColor, 0.7);
         }
+        
+        // 3.5 Pedagogical Ghost Blueprint
+        if (helpBlueprint) {
+            ctx.save();
+            ctx.setLineDash([8, 8]);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = theme === 'light' ? 'rgba(71, 85, 105, 0.4)' : 'rgba(148, 163, 184, 0.4)';
+            
+            helpBlueprint.beams.forEach(gb => {
+                ctx.beginPath();
+                ctx.moveTo(gb.nodeA.x, gb.nodeA.y);
+                ctx.lineTo(gb.nodeB.x, gb.nodeB.y);
+                ctx.stroke();
+            });
+
+            ctx.fillStyle = ctx.strokeStyle;
+            helpBlueprint.nodes.forEach(gn => {
+                ctx.beginPath();
+                ctx.arc(gn.x, gn.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.restore();
+        }
 
         // 4. NODES, BEAMS, CAR (Interactive Layer)
         if (draggingStartNode && !isSimulating) {
@@ -1305,31 +1673,67 @@ document.addEventListener('DOMContentLoaded', () => {
         beams.forEach(b => {
             if(b.broken) return;
             ctx.beginPath(); ctx.moveTo(b.nodeA.x, b.nodeA.y); ctx.lineTo(b.nodeB.x, b.nodeB.y);
-            const material = MATERIAL_CONFIG[b.size] || MATERIAL_CONFIG.standard;
-            let targetYield = material.yield;
-            let stressPrc = Math.min(b.strain / targetYield, 1);
-            
-            if(isSimulating) {
-                // Professional Heatmap: Green -> Yellow -> Orange -> Red
-                const hue = (1 - stressPrc) * 120; // 120 is green, 0 is red
-                ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
-                if (stressPrc > 0.8) {
-                    ctx.shadowBlur = 8;
-                    ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
-                }
-            } else {
-                ctx.strokeStyle = hoveredBeam === b ? '#ef4444' : p.beam;
-            }
-            ctx.lineWidth = b.size === 'light' ? 2.5 : (b.size === 'heavy' ? 8 : 4.5);
-            ctx.stroke();
-            ctx.shadowBlur = 0;
 
+            // Material and Stress Logic
+            const material = MATERIAL_CONFIG[b.size] || MATERIAL_CONFIG.standard;
+            const targetYield = material.yield;
+            const stressPrc = Math.min(b.strain / targetYield, 1);
+
+            if (b.isRoad) {
+                // Specialized Road drawing: Thick dark gray line (the deck)
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 12;
+                ctx.stroke();
+                
+                // Add center line
+                ctx.setLineDash([10, 10]);
+                ctx.strokeStyle = '#fde047';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // Final thin highlight
+                ctx.strokeStyle = '#475569';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            } else {
+                if(isSimulating) {
+                    // Professional Heatmap: Green -> Yellow -> Orange -> Red
+                    const hue = (1 - stressPrc) * 120; // 120 is green, 0 is red
+                    ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+                    if (stressPrc > 0.8) {
+                        ctx.shadowBlur = 8;
+                        ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+                    }
+                } else {
+                    ctx.strokeStyle = hoveredBeam === b ? '#ef4444' : p.beam;
+                }
+                ctx.lineWidth = b.size === 'light' ? 2.5 : (b.size === 'heavy' ? 8 : 4.5);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // Shared telemetry display for ALL beams (Truss + Road)
             if (isSimulating) {
-                let centerX = (b.nodeA.x + b.nodeB.x) / 2; let centerY = (b.nodeA.y + b.nodeB.y) / 2;
-                if (stressPrc > 0.5) {
-                    ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = stressPrc > 0.9 ? '#ff0000' : '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.shadowColor = "black"; ctx.shadowBlur = 4;
-                    ctx.fillText(`${(stressPrc * 100).toFixed(0)}%`, centerX, centerY - Math.max(12, ctx.lineWidth)); ctx.shadowBlur = 0;
+                let centerX = (b.nodeA.x + b.nodeB.x) / 2; 
+                let centerY = (b.nodeA.y + b.nodeB.y) / 2;
+                
+                if (stressPrc > 0.05) {
+                    ctx.font = 'bold 12px sans-serif'; 
+                    ctx.fillStyle = stressPrc > 0.9 ? '#ff0000' : '#ffffff'; 
+                    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    
+                    // Offset text slightly above the beam to ensure visibility
+                    // even on thick Road pieces (12px) or Heavy beams (8px)
+                    const labelOffset = b.isRoad ? 18 : 12;
+                    
+                    // High-contrast outline
+                    ctx.save();
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#000000';
+                    ctx.strokeText(`${(stressPrc * 100).toFixed(0)}%`, centerX, centerY - labelOffset);
+                    ctx.fillText(`${(stressPrc * 100).toFixed(0)}%`, centerX, centerY - labelOffset);
+                    ctx.restore();
                 }
             }
         });
