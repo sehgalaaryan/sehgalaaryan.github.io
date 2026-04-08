@@ -9,13 +9,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusText = document.getElementById('status-text');
     const statusClose = document.getElementById('btn-status-close');
     
-    function resizeCanvas() {
+    // Resize canvas dimensions only — does NOT reset the level.
+    // Call initEnvironment() explicitly when a full reset is required.
+    // True while the browser is animating into/out of fullscreen.
+    // During this window the native 'resize' event fires but we must NOT
+    // call initEnvironment — that would wipe the user's structure.
+    let isFullscreenTransitioning = false;
+
+    function resizeCanvas(keepLevel) {
         if (!canvas.parentElement) return;
+        if (isSimulating) return; // Never corrupt physics mid-run
+        if (isFullscreenTransitioning) return; // Ignore resize events from fullscreen toggle
         canvas.width = canvas.parentElement.clientWidth;
         canvas.height = canvas.clientHeight || (canvas.width * 0.5);
-        initEnvironment();
+        if (!keepLevel) initEnvironment();
+        else if (nodes.length > 0) draw();
     }
-    window.addEventListener('resize', resizeCanvas);
+    window.addEventListener('resize', () => resizeCanvas(false));
 
     // Simulation Data
     let nodes = [];
@@ -85,7 +95,84 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // Vehicle Data
-    let car = { active: false, x: 0, y: 0, speed: 1.5, state: 'idle' };
+    let car = { active: false, x: 0, y: 0, vy: 0, rotation: 0, speed: 1.5, state: 'idle' };
+
+    function resetVehicleToStart() {
+        car.x = levelState.bLeftX - 50;
+        if (currentLevel === 'mountain') {
+            car.y = levelState.bankY - 15;
+        } else {
+            car.y = levelState.bankY - 15;
+        }
+        car.vy = 0;
+        car.rotation = 0;
+        car.speed = 1.5;
+        car.state = 'idle';
+        car.active = false;
+    }
+
+    function setSimulatingUI(simulating) {
+        // IDs of all buttons/selects that must be locked during simulation.
+        const LIKELY_LOCKED = [
+            'btn-mode-toggle', 'btn-undo', 'btn-redo', 'btn-save-checkpoint',
+            'btn-simulate', 'btn-fullscreen', 'level-selector', 
+            'beam-size-selector', 'budget-selector'
+        ];
+
+        LIKELY_LOCKED.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.disabled = simulating;
+            el.style.opacity = simulating ? '0.4' : '';
+            el.style.pointerEvents = simulating ? 'none' : '';
+        });
+
+        // Diagnostic & Emergency Tools - ALWAYS interactive for engineering iteration
+        const PERMANENT_TOOLS = ['btn-reset', 'btn-restore-checkpoint', 'btn-grid-toggle'];
+        PERMANENT_TOOLS.forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.style.opacity = '1';
+            el.style.pointerEvents = 'auto';
+            el.disabled = false;
+        });
+
+        // Post-failure Safeguard: Keep Save greyed out so a collapsed structure 
+        // cannot overwrite a valid design checkpoint.
+        if (!simulating && car.state === 'failed') {
+            const saveBtn = document.getElementById('btn-save-checkpoint');
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.style.opacity = '0.4';
+                saveBtn.style.pointerEvents = 'none';
+                saveBtn.title = 'Cannot save — structure has collapsed';
+            }
+        } else if (!simulating) {
+            // Restore tooltips/states when simulation is properly exited
+            const saveBtn = document.getElementById('btn-save-checkpoint');
+            if (saveBtn) saveBtn.title = 'Save Structure State';
+            updateUndoButtons();
+            updateRestoreButtonState();
+        }
+    }
+
+    function updateRestoreButtonState() {
+        const btn = document.getElementById('btn-restore-checkpoint');
+        if (!btn) return;
+        
+        const saves = getPersistentSaves();
+        const hasSave = saves[currentLevel] && saves[currentLevel].nodes && saves[currentLevel].nodes.length > 0;
+        
+        if (hasSave) {
+            btn.style.opacity = '1';
+            btn.style.pointerEvents = 'auto';
+            btn.style.cursor = 'pointer';
+        } else {
+            btn.style.opacity = '0.35';
+            btn.style.pointerEvents = 'none';
+            btn.style.cursor = 'not-allowed';
+        }
+    }
 
     // Undo/Redo System
     let undoStack = [];
@@ -110,7 +197,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function restoreFromSnapshot(snapshot) {
         nodes = snapshot.nodes.map(n => new Node(n.x, n.y, n.fixed));
-        beams = snapshot.beams.map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size));
+        // Guard against stale indices (-1) that can occur after level switches
+        beams = snapshot.beams
+            .filter(b => b.idxA >= 0 && b.idxB >= 0 && b.idxA < nodes.length && b.idxB < nodes.length)
+            .map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size));
         updateBudgetUI();
         draw();
     }
@@ -160,10 +250,94 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUndoButtons();
     }
 
-    // Checkpoints & Tracking
-    let checkpointData = { nodes: [], beams: [] };
+    // Checkpoints & Tracking (Persistent)
+    const STORAGE_KEY = 'bridge_puzzle_saves';
     let firstBrokenBeam = null;
     let brokeAtX = 0; let brokeAtY = 0; let brokeStrain = 0;
+    let ghostStructure = null;
+
+    function getPersistentSaves() {
+        try {
+            const data = localStorage.getItem(STORAGE_KEY);
+            return data ? JSON.parse(data) : {};
+        } catch (e) {
+            console.error('Failed to load storage:', e);
+            return {};
+        }
+    }
+
+    function saveToPersistentStorage(levelId, design) {
+        try {
+            const saves = getPersistentSaves();
+            saves[levelId] = design;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(saves));
+        } catch (e) {
+            console.error('Failed to save to storage:', e);
+        }
+    }
+
+    function performSave() {
+        if(isSimulating) return;
+        const design = {
+            nodes: nodes.map(n => {
+                let relX = (n.x - levelState.bLeftX) / levelState.gapWidth;
+                let expectedBankY = levelState.isAsymmetric 
+                    ? levelState.bankY + relX * (levelState.bankYRight - levelState.bankY)
+                    : levelState.bankY;
+                return {
+                    relX: relX,
+                    relY: (n.y - expectedBankY) / levelState.gapWidth,
+                    fixed: n.fixed
+                };
+            }),
+            beams: beams.map(b => ({
+                idxA: nodes.indexOf(b.nodeA),
+                idxB: nodes.indexOf(b.nodeB),
+                size: b.size
+            }))
+        };
+        saveToPersistentStorage(currentLevel, design);
+        updateRestoreButtonState();
+        if (window.showToast) {
+            window.showToast('Level Design Saved!', 'success');
+        } else {
+            showPuzzleStatus(true, 'Level Design Saved!');
+            setTimeout(() => statusBanner.classList.add('hidden'), 2000);
+        }
+    }
+
+    function performRestore(levelId) {
+        const saves = getPersistentSaves();
+        const design = saves[levelId];
+        if (!design || !design.nodes || design.nodes.length === 0) {
+            return false;
+        }
+        
+        isSimulating = false;
+        if(animFrame) cancelAnimationFrame(animFrame);
+        car.active = false; car.state = 'idle';
+        firstBrokenBeam = null; statusBanner.classList.add('hidden');
+        
+        nodes = design.nodes.map(n => {
+            let absX = levelState.bLeftX + (n.relX * levelState.gapWidth);
+            let bankYAtX = levelState.isAsymmetric 
+                ? levelState.bankY + n.relX * (levelState.bankYRight - levelState.bankY)
+                : levelState.bankY;
+            let absY = bankYAtX + (n.relY * levelState.gapWidth);
+            return new Node(absX, absY, n.fixed);
+        });
+        
+        beams = design.beams
+            .filter(b => b.idxA >= 0 && b.idxB >= 0 && b.idxA < nodes.length && b.idxB < nodes.length)
+            .map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size));
+        
+        resetVehicleToStart();
+        
+        updateBudgetUI();
+        setSimulatingUI(false);
+        draw();
+        return true;
+    }
 
     // Anchor points for fixed geometry (Fixed Coordinate Locking)
     let levelState = {
@@ -211,9 +385,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function initEnvironment() {
+    function initEnvironment(shouldRestore = false) {
         nodes = [];
         beams = [];
+        ghostStructure = null;
         isSimulating = false;
         car.active = false;
         car.state = 'idle';
@@ -221,8 +396,23 @@ document.addEventListener('DOMContentLoaded', () => {
         brokeAtX = 0; brokeAtY = 0; brokeStrain = 0;
         statusBanner.classList.add('hidden');
 
+        // Clear undo/redo history — stale snapshots from a previous level
+        // reference wrong node indices and would corrupt restore.
+        undoStack = [];
+        redoStack = [];
+        updateUndoButtons(); // Reflect the cleared stacks in the UI immediately
+
+        // Reset operation mode to build so the button label is always consistent.
+        operationMode = 'build';
+        const modeSpan = document.querySelector('#btn-mode-toggle span');
+        if (modeSpan) modeSpan.innerText = 'Build';
+        const modeBtnEl = document.getElementById('btn-mode-toggle');
+        if (modeBtnEl) modeBtnEl.classList.remove('danger-btn');
+
         if(animFrame) cancelAnimationFrame(animFrame);
         currentLevel = levelSelector ? levelSelector.value : 'river';
+        
+        updateRestoreButtonState();
         
         if (currentLevel === 'river') {
             budget = 15000;
@@ -319,13 +509,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Pre-generate Level Backgrounds for stability
-        const genBG = (count, minH, maxH) => {
+        const genBG = (count, relMinH, relMaxH) => {
             let data = [];
             for (let i = 0; i < count; i++) {
                 data.push({
-                    x: Math.random() * canvas.width,
-                    w: 60 + Math.random() * 100,
-                    h: minH + Math.random() * (maxH - minH),
+                    relX: Math.random(),
+                    relW: 0.1 + Math.random() * 0.15, // Proportion of canvas width
+                    relH: relMinH + Math.random() * (relMaxH - relMinH), // Proportion of canvas height
                     alpha: 0.05 + Math.random() * 0.1
                 });
             }
@@ -333,21 +523,44 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         if (currentLevel === 'river') {
-            levelBackgroundData.river = genBG(10, 50, 120);
+            // River elements scale slightly but stay small (4% to 12% of height)
+            levelBackgroundData.river = genBG(10, 0.04, 0.12);
         } else if (currentLevel === 'city') {
-            levelBackgroundData.city = genBG(15, 100, 250);
+            levelBackgroundData.city = genBG(15, 0.28, 0.58);
         } else if (currentLevel === 'highway') {
-            levelBackgroundData.highway = genBG(8, 80, 200);
+            levelBackgroundData.highway = genBG(8, 0.18, 0.48);
         } else if (currentLevel === 'pylons') {
-            levelBackgroundData.pylons = genBG(12, 60, 180);
+            levelBackgroundData.pylons = genBG(12, 0.14, 0.44);
         } else if (currentLevel === 'mountain') {
             levelBackgroundData.mountain = [];
-            // Jagged mountain peaks
-            for (let i = 0; i < 6; i++) {
+            const gs = levelState.bLeftX;
+            const ge = levelState.bRightX;
+            const gw = ge - gs;
+
+            const farCount = 5;
+            for (let i = 0; i < farCount; i++) {
+                const t = i / (farCount - 1);
+                const relW = 0.12 + Math.random() * 0.14; // Relative to gap width
                 levelBackgroundData.mountain.push({
-                    x: (canvas.width / 5) * i - 50 + Math.random() * 100,
-                    w: 250 + Math.random() * 200,
-                    h: 150 + Math.random() * 200
+                    layer: 'far',
+                    // Relative to gap width and start position
+                    relX: (-0.1 + 1.2 * t - relW * 0.5 + (Math.random() - 0.5) * 0.07),
+                    relW: relW,
+                    relH: 0.40 + Math.random() * 0.30, // 40-70% of canvas height
+                    alpha: 0.13 + Math.random() * 0.12
+                });
+            }
+
+            const midCount = 3;
+            for (let i = 0; i < midCount; i++) {
+                const t = i / (midCount - 1);
+                const relW = 0.16 + Math.random() * 0.18;
+                levelBackgroundData.mountain.push({
+                    layer: 'mid',
+                    relX: (-0.05 + 1.1 * t - relW * 0.5 + (Math.random() - 0.5) * 0.06),
+                    relW: relW,
+                    relH: 0.48 + Math.random() * 0.27, // 48-75% of canvas height
+                    alpha: 0.18 + Math.random() * 0.10
                 });
             }
         }
@@ -361,37 +574,39 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (mode === 'infinite') budget = 999999999;
         }
 
-        car.x = levelState.bLeftX - 50;
-        car.y = levelState.bankY - 15;
+        resetVehicleToStart();
         
-        updateBudgetUI();
-        draw();
+        if (shouldRestore) {
+            performRestore(currentLevel);
+        } else {
+            updateBudgetUI();
+            draw();
+        }
     }
 
     const budgetSelector = document.getElementById('budget-selector');
     if (budgetSelector) {
         budgetSelector.addEventListener('change', () => {
-            if (isSimulating) return; // Prevent accidental resets during runs
-            saveHistory(); 
-            initEnvironment(); // Re-calc relative to level
+            if (isSimulating) return;
+            initEnvironment(false); 
         });
     }
-
+ 
     document.getElementById('btn-undo')?.addEventListener('click', undo);
     document.getElementById('btn-redo')?.addEventListener('click', redo);
-
+ 
     const gridToggleBtn = document.getElementById('btn-grid-toggle');
     if (gridToggleBtn) {
         gridToggleBtn.addEventListener('click', () => {
             isGridEnabled = !isGridEnabled;
             const span = gridToggleBtn.querySelector('span');
-            if (span) span.innerText = 'Grid'; // Keep 'Grid' as standard
+            if (span) span.innerText = 'Grid';
             gridToggleBtn.classList.toggle('active', isGridEnabled);
             draw();
         });
     }
-
-    levelSelector?.addEventListener('change', initEnvironment);
+ 
+    levelSelector?.addEventListener('change', () => initEnvironment(false));
 
     // --- Buttons & UI Logic ---
     const modeToggleBtn = document.getElementById('btn-mode-toggle');
@@ -410,45 +625,151 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // ── Fullscreen transition overlay ──────────────────────────────
+    // IMPORTANT: The overlay MUST be inside .game-container, not body.
+    // When .game-container becomes the fullscreen element, browsers only
+    // render that element's subtree — everything on <body> outside it is
+    // hidden, so a position:fixed overlay on body is invisible during fullscreen.
+    const gameContainerEl = document.querySelector('.game-container');
+    const fsOverlay = document.createElement('div');
+    fsOverlay.style.cssText = [
+        'position:absolute', 'inset:0',
+        'background:#000',
+        'opacity:0', 'pointer-events:none',
+        'z-index:9999',
+        'transition:opacity 0.25s ease'
+    ].join(';');
+    if (gameContainerEl) gameContainerEl.appendChild(fsOverlay);
+
+    const OVERLAY_FADE_MS = 250;
+
+    function animateOverlay(show, callback) {
+        fsOverlay.style.opacity = show ? '1' : '0';
+        setTimeout(callback, OVERLAY_FADE_MS + 20);
+    }
+
     const fullscreenBtn = document.getElementById('btn-fullscreen');
     if (fullscreenBtn) {
         fullscreenBtn.addEventListener('click', () => {
+            isFullscreenTransitioning = true;
             const container = document.querySelector('.game-container');
-            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                let req = container.requestFullscreen ? container.requestFullscreen() : (container.webkitRequestFullscreen ? container.webkitRequestFullscreen() : null);
-                if (req && req.then) {
-                    req.then(() => {
-                        if (screen.orientation && screen.orientation.lock) {
-                            screen.orientation.lock("landscape").catch(e => console.warn(e));
-                        }
-                    }).catch(e => console.warn(e));
-                }
-            } else {
-                let req = document.exitFullscreen ? document.exitFullscreen() : (document.webkitExitFullscreen ? document.webkitExitFullscreen() : null);
-                if (req && req.then) {
-                    req.then(() => {
-                        if (screen.orientation && screen.orientation.unlock) {
-                            screen.orientation.unlock();
-                        }
-                    }).catch(e => console.warn(e));
-                } else if (document.exitFullscreen) {
-                    if (screen.orientation && screen.orientation.unlock) {
-                        screen.orientation.unlock();
+            const entering = !document.fullscreenElement && !document.webkitFullscreenElement;
+
+            // ① Fade to black first (overlay is inside game-container so it's always visible)
+            animateOverlay(true, () => {
+                // ② While screen is dark — switch fullscreen mode
+                if (entering) {
+                    const req = container.requestFullscreen
+                        ? container.requestFullscreen()
+                        : (container.webkitRequestFullscreen ? container.webkitRequestFullscreen() : null);
+                    if (req && req.then) {
+                        req.then(() => {
+                            if (screen.orientation && screen.orientation.lock) {
+                                screen.orientation.lock('landscape').catch(e => console.warn(e));
+                            }
+                        }).catch(e => {
+                            console.warn(e);
+                            animateOverlay(false, () => { isFullscreenTransitioning = false; });
+                        });
+                    }
+                } else {
+                    const req = document.exitFullscreen
+                        ? document.exitFullscreen()
+                        : (document.webkitExitFullscreen ? document.webkitExitFullscreen() : null);
+                    if (req && req.then) {
+                        req.then(() => {
+                            if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+                        }).catch(e => {
+                            console.warn(e);
+                            animateOverlay(false, () => { isFullscreenTransitioning = false; });
+                        });
                     }
                 }
-            }
+            });
         });
     }
 
     const toggleFsText = () => {
-        setTimeout(resizeCanvas, 100);
-        const span = fullscreenBtn.querySelector('span');
-        if(span) {
+        const span = fullscreenBtn ? fullscreenBtn.querySelector('span') : null;
+        if (span) {
             span.innerText = (document.fullscreenElement || document.webkitFullscreenElement) ? 'Exit' : 'Full';
         }
+
+        // Wait for CSS layout to settle after the fullscreen switch
+        setTimeout(() => {
+            if (!canvas.parentElement) {
+                animateOverlay(false, () => { isFullscreenTransitioning = false; });
+                return;
+            }
+
+            // AUTO-RESET ON FAILURE: If entering/exiting FS during a crash, clear the wreckage.
+            if (car.state === 'failed' || car.state === 'passed') {
+                initEnvironment(true); // This resets physics, clears wreckage, and restores design
+            }
+
+            // ── Step 1: Snapshot user structure in level-relative coords ──
+            const freeNodeRels = nodes
+                .filter(n => !n.fixed)
+                .map(n => {
+                    const relX = levelState.gapWidth > 0
+                        ? (n.x - levelState.bLeftX) / levelState.gapWidth : 0;
+                    const bankYAtX = levelState.isAsymmetric
+                        ? levelState.bankY + relX * (levelState.bankYRight - levelState.bankY)
+                        : levelState.bankY;
+                    const relY = levelState.gapWidth > 0
+                        ? (n.y - bankYAtX) / levelState.gapWidth : 0;
+                    return { relX, relY };
+                });
+
+            const beamDefs = beams.map(b => ({
+                idxA: nodes.indexOf(b.nodeA),
+                idxB: nodes.indexOf(b.nodeB),
+                size: b.size
+            }));
+
+            // ── Step 2: Compute new canvas pixel dimensions reliably ──
+            // Read from the CONTAINER dimensions minus the UI toolbar height.
+            // This avoids any canvas self-sizing quirk (height:0, aspect-ratio, etc.)
+            // that can make canvas.getBoundingClientRect().height return 0.
+            const uiBar = canvas.parentElement.querySelector('.game-ui');
+            const uiH  = uiBar ? uiBar.offsetHeight : 0;
+            const newW = canvas.parentElement.clientWidth  || window.innerWidth;
+            const newH = (canvas.parentElement.clientHeight - uiH) || Math.round(newW * 0.5);
+
+            canvas.width  = Math.max(newW, 1);
+            canvas.height = Math.max(newH, 1);
+
+            // ── Step 3: Re-init so levelState recalculates for the new size ──
+            initEnvironment();
+
+            // ── Step 4: Re-inject free nodes at scaled absolute positions ──
+            freeNodeRels.forEach(nr => {
+                const bankYAtX = levelState.isAsymmetric
+                    ? levelState.bankY + nr.relX * (levelState.bankYRight - levelState.bankY)
+                    : levelState.bankY;
+                const absX = levelState.bLeftX + nr.relX * levelState.gapWidth;
+                const absY = bankYAtX + nr.relY * levelState.gapWidth;
+                nodes.push(new Node(absX, absY, false));
+            });
+
+            // ── Step 5: Restore beams via stable index mapping ──
+            beams = beamDefs
+                .filter(b => b.idxA >= 0 && b.idxB >= 0
+                          && b.idxA < nodes.length && b.idxB < nodes.length)
+                .map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size));
+
+            updateBudgetUI();
+            draw();
+
+            // ③ Fade back in revealing the correctly rescaled game
+            animateOverlay(false, () => { isFullscreenTransitioning = false; });
+
+        }, 200); // 200ms: safe margin for CSS flex layout to resolve after fullscreenchange
     };
     document.addEventListener('fullscreenchange', toggleFsText);
     document.addEventListener('webkitfullscreenchange', toggleFsText);
+
+
 
     // --- Interaction ---
     canvas.addEventListener('pointermove', (e) => {
@@ -507,8 +828,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const isDeleteAction = (e.button === 2) || (operationMode === 'delete');
 
         if (!isDeleteAction && e.button === 0) { 
-            if (hoveredNode) draggingStartNode = hoveredNode;
-            else {
+            if (hoveredNode) {
+                // Starting drag from existing node — save history now so undo reverts the upcoming beam
+                saveHistory();
+                draggingStartNode = hoveredNode;
+            } else {
+                // Creating a brand new node + potentially a beam — save history before both
                 saveHistory();
                 const rect = canvas.getBoundingClientRect();
                 mousePos.x = e.clientX - rect.left;
@@ -566,7 +891,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         (b.nodeB === draggingStartNode && b.nodeA === targetNode)
                     );
                     if(!exists) {
-                        saveHistory();
+                        // No saveHistory here — it was already called in pointerdown
                         const beamSize = document.getElementById('beam-size-selector') ? document.getElementById('beam-size-selector').value : 'standard';
                         beams.push(new Beam(draggingStartNode, targetNode, beamSize));
                         updateBudgetUI();
@@ -579,8 +904,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     canvas.addEventListener('pointerleave', () => {
-        draggingStartNode = null;
-        if(!isSimulating) draw();
+        if (draggingStartNode && !isSimulating) {
+            // If we were dragging from a freshly-created node (it has no beams yet
+            // and wasn't there before pointerdown), remove it to avoid orphan nodes.
+            const hasNoBeams = !beams.some(b => b.nodeA === draggingStartNode || b.nodeB === draggingStartNode);
+            if (!draggingStartNode.fixed && hasNoBeams) {
+                // Also roll back the history entry that was pushed for this node
+                undoStack.pop();
+                nodes = nodes.filter(n => n !== draggingStartNode);
+                updateUndoButtons();
+            }
+            draggingStartNode = null;
+            draw();
+        }
     });
 
     // --- Physics Engine (Verlet + Raycast Pathing) ---
@@ -619,8 +955,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     b.broken = true;  // Snap!
                     if (!firstBrokenBeam) {
                         firstBrokenBeam = b;
-                        brokeAtX = (b.nodeA.x + b.nodeB.x) / 2;
-                        brokeAtY = (b.nodeA.y + b.nodeB.y) / 2;
+                        // ANCHOR: Use original coordinates from ghostStructure for the X mark
+                        const bIdx = beams.indexOf(b);
+                        if (ghostStructure && ghostStructure.beams[bIdx]) {
+                            brokeAtX = ghostStructure.beams[bIdx].midX;
+                            brokeAtY = ghostStructure.beams[bIdx].midY;
+                        } else {
+                            brokeAtX = (b.nodeA.x + b.nodeB.x) / 2;
+                            brokeAtY = (b.nodeA.y + b.nodeB.y) / 2;
+                        }
                         brokeStrain = b.strain / targetYield;
                     }
                 }
@@ -685,34 +1028,47 @@ document.addEventListener('DOMContentLoaded', () => {
             if (trackY !== null) {
                 // Stick to track
                 car.y = trackY - 10;
+                car.vy = 0;
+                car.rotation = car.rotation * 0.9; // Level out on track
                 
                 // Track Slope Calculation
-                if(currentBeam && car.x > 0 && car.x < levelState.bRightX) {
-                    // Apply Heavy Weight Load
+                // Only apply vehicle load while the car is over the bridge span,
+                // not when it is still riding the fixed ground banks.
+                if(currentBeam && car.x > levelState.bLeftX && car.x < levelState.bRightX) {
                     if(car.speed > 0) {
                         let totalDx = currentBeam.nodeB.x - currentBeam.nodeA.x;
-                        let tPrc = (car.x - currentBeam.nodeA.x) / totalDx; 
-                        let load = GRAVITY * 16.0; 
+                        let tPrc = totalDx !== 0 ? (car.x - currentBeam.nodeA.x) / totalDx : 0.5;
+                        let load = GRAVITY * 18.0; // Slightly increased for impact
                         
                         if (!currentBeam.nodeA.fixed) currentBeam.nodeA.y += load * (1 - tPrc);
                         if (!currentBeam.nodeB.fixed) currentBeam.nodeB.y += load * tPrc;
                     }
                 }
             } else {
-                // Freefall (bridge broke or gap!)
-                car.y += car.speed * 4;
+                // Realistic Physics Fall
+                car.vy += GRAVITY;
+                car.y += car.vy;
+                car.rotation += 0.05 * car.speed;
             }
 
             // Win / Loss Conditions
-            if (car.y > canvas.height) {
+            if (car.y > canvas.height + 200) {
+                // Done simulating entirely - hide car
+                car.active = false;
+                // KEEP isSimulating=true so pulses and ghost rendering keep animating.
+                // We just stop the physics work by moving the condition into a sub-block.
+            } else if (car.state === 'driving' && car.y > canvas.height) {
+                // First time falling below screen
                 car.state = 'failed';
-                isSimulating = false; // Stop the simulation loop
                 let failReason = firstBrokenBeam ? `Beam snapped at ${Math.round(brokeStrain * 100)}% strain!` : 'Catastrophic Structural Failure! The vehicle fell.';
-                showGameStatus(false, failReason);
-            } else if (car.x > levelState.bRightX + 20) {
+                showPuzzleStatus(false, failReason);
+                // Keep UI DISABLED until explicitly closed or reset
+            } else if (car.state === 'driving' && car.x > levelState.bRightX + 20) {
                 car.state = 'passed';
-                isSimulating = false; // Stop the simulation loop
+                // Success: Stop the loop since we usually transition or celebrate
+                isSimulating = false;
                 showPuzzleStatus(true, 'Structural Integrity Confirmed! You Win!');
+                setSimulatingUI(false); 
             }
         }
 
@@ -731,6 +1087,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     statusClose.addEventListener('click', () => {
         statusBanner.classList.add('hidden');
+        if (car.state === 'failed') {
+            // Re-enable UI so the user can BUILD while the debris settled/X pulses.
+            // We KEEP isSimulating=true so the 'draw' loop continues rendering the pulse.
+            setSimulatingUI(false);
+        } else if (car.state === 'passed') {
+            isSimulating = false;
+            setSimulatingUI(false);
+            car.active = false;
+            draw();
+        }
     });
 
     function draw() {
@@ -740,91 +1106,92 @@ document.addEventListener('DOMContentLoaded', () => {
         // 1. SKY & DISTANT BACKGROUND (Atmospheric Layer)
         const skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
         if (currentLevel === 'river') {
+            // Anchor elements to just above the river surface (riverDepthY = bankY + 120).
+            const riverDepthY = levelState.bankY + 120;
             if (theme === 'vibrant') {
-                skyGrad.addColorStop(0, '#2d064e'); 
-                skyGrad.addColorStop(0.6, '#160436');
-                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                levelBackgroundData.river.forEach(n => {
-                    ctx.fillStyle = '#d8b4fe';
-                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
-                });
+                skyGrad.addColorStop(0, '#2d064e'); skyGrad.addColorStop(0.6, '#160436');
+            } else if (theme === 'light') {
+                skyGrad.addColorStop(0, '#bae6fd'); skyGrad.addColorStop(0.6, '#f0f9ff');
             } else {
-                skyGrad.addColorStop(0, theme === 'light' ? '#bae6fd' : '#0c4a6e'); 
-                skyGrad.addColorStop(0.6, theme === 'light' ? '#f0f9ff' : '#075985');
-                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                levelBackgroundData.river.forEach(n => {
-                    ctx.fillStyle = theme === 'light' ? '#7dd3fc' : '#38bdf8'; // Sky blue tint
-                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
-                });
+                skyGrad.addColorStop(0, '#0c4a6e'); skyGrad.addColorStop(0.6, '#075985');
             }
+            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            levelBackgroundData.river.forEach(n => {
+                ctx.fillStyle = theme === 'vibrant' ? '#d8b4fe' : (theme === 'light' ? '#7dd3fc' : '#38bdf8');
+                ctx.globalAlpha = n.alpha;
+                const h = n.relH * canvas.height;
+                const w = n.relW * canvas.width;
+                ctx.fillRect(n.relX * canvas.width, riverDepthY - h, w, h);
+            });
+
         } else if (currentLevel === 'city') {
             if (theme === 'vibrant') {
-                skyGrad.addColorStop(0, '#160436'); 
-                skyGrad.addColorStop(0.6, '#090014'); 
-                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                levelBackgroundData.city.forEach(n => {
-                    ctx.fillStyle = '#b249f8';
-                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
-                });
+                skyGrad.addColorStop(0, '#160436'); skyGrad.addColorStop(0.6, '#090014');
+            } else if (theme === 'light') {
+                skyGrad.addColorStop(0, '#cbd5e1'); skyGrad.addColorStop(0.6, '#f8fafc');
             } else {
-                skyGrad.addColorStop(0, theme === 'light' ? '#cbd5e1' : '#0f172a'); 
-                skyGrad.addColorStop(0.6, theme === 'light' ? '#f8fafc' : '#141e33'); 
-                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                levelBackgroundData.city.forEach(n => {
-                    ctx.fillStyle = theme === 'light' ? '#64748b' : '#cbd5e1'; // Brighter in dark mode
-                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
-                });
+                skyGrad.addColorStop(0, '#0f172a'); skyGrad.addColorStop(0.6, '#141e33');
             }
+            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            levelBackgroundData.city.forEach(n => {
+                ctx.fillStyle = theme === 'vibrant' ? '#b249f8' : (theme === 'light' ? '#64748b' : '#cbd5e1');
+                ctx.globalAlpha = n.alpha;
+                const h = n.relH * canvas.height;
+                const w = n.relW * canvas.width;
+                ctx.fillRect(n.relX * canvas.width, canvas.height - h, w, h);
+            });
+
         } else if (currentLevel === 'mountain') {
             if (theme === 'vibrant') {
-                skyGrad.addColorStop(0, '#2d064e'); 
-                skyGrad.addColorStop(0.6, '#090014'); 
-                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                levelBackgroundData.mountain.forEach(n => {
-                    ctx.fillStyle = '#ff007f';
-                    ctx.globalAlpha = 0.2;
-                    ctx.beginPath(); ctx.moveTo(n.x, canvas.height);
-                    ctx.lineTo(n.x + n.w / 2, canvas.height - n.h);
-                    ctx.lineTo(n.x + n.w, canvas.height); ctx.fill();
-                });
+                skyGrad.addColorStop(0, '#2d064e'); skyGrad.addColorStop(0.6, '#090014');
+            } else if (theme === 'light') {
+                skyGrad.addColorStop(0, '#e2e8f0'); skyGrad.addColorStop(0.6, '#f1f5f9');
             } else {
-                skyGrad.addColorStop(0, theme === 'light' ? '#e2e8f0' : '#1e1b4b'); 
-                skyGrad.addColorStop(0.6, theme === 'light' ? '#f1f5f9' : '#312e81'); 
-                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                levelBackgroundData.mountain.forEach(n => {
-                    ctx.fillStyle = theme === 'light' ? '#94a3b8' : '#818cf8'; // Brighter in dark mode
-                    ctx.globalAlpha = 0.2;
-                    ctx.beginPath(); ctx.moveTo(n.x, canvas.height);
-                    ctx.lineTo(n.x + n.w / 2, canvas.height - n.h);
-                    ctx.lineTo(n.x + n.w, canvas.height); ctx.fill();
-                });
+                skyGrad.addColorStop(0, '#1e1b4b'); skyGrad.addColorStop(0.6, '#312e81');
             }
+            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const gs = levelState.bLeftX;
+            const ge = levelState.bRightX;
+            const gw = ge - gs;
+
+            levelBackgroundData.mountain.forEach(n => {
+                if (n.layer === 'far') {
+                    ctx.fillStyle = theme === 'vibrant' ? '#ff007f' : (theme === 'light' ? '#94a3b8' : '#818cf8');
+                } else {
+                    ctx.fillStyle = theme === 'vibrant' ? '#c2185b' : (theme === 'light' ? '#64748b' : '#6366f1');
+                }
+                ctx.globalAlpha = n.alpha;
+                const h = n.relH * canvas.height;
+                const w = n.relW * gw;
+                const x = gs + n.relX * gw;
+                ctx.beginPath(); ctx.moveTo(x, canvas.height);
+                ctx.lineTo(x + w / 2, canvas.height - h);
+                ctx.lineTo(x + w, canvas.height); ctx.fill();
+            });
+
         } else {
-            // Highway / Pylons
             if (theme === 'vibrant') {
-                skyGrad.addColorStop(0, '#160436');
-                skyGrad.addColorStop(0.6, '#090014');
-                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                const depthBG = (currentLevel === 'highway') ? levelBackgroundData.highway : levelBackgroundData.pylons;
-                depthBG.forEach(n => {
-                    ctx.fillStyle = '#b249f8'; // Purple haze silhouette
-                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
-                });
+                skyGrad.addColorStop(0, '#160436'); skyGrad.addColorStop(0.6, '#090014');
+            } else if (theme === 'light') {
+                skyGrad.addColorStop(0, '#cbd5e1'); skyGrad.addColorStop(0.6, '#f8fafc');
             } else {
-                skyGrad.addColorStop(0, theme === 'light' ? '#cbd5e1' : '#0f172a'); 
-                skyGrad.addColorStop(0.6, theme === 'light' ? '#f8fafc' : '#1e293b');
-                ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
-                const depthBG = (currentLevel === 'highway') ? levelBackgroundData.highway : levelBackgroundData.pylons;
-                depthBG.forEach(n => {
-                    ctx.fillStyle = theme === 'light' ? '#94a3b8' : '#cbd5e1'; // Brighter in dark mode for visibility
-                    ctx.globalAlpha = n.alpha; ctx.fillRect(n.x, canvas.height - n.h, n.w, n.h);
-                });
+                skyGrad.addColorStop(0, '#0f172a'); skyGrad.addColorStop(0.6, '#1e293b');
             }
+            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const depthBG = (currentLevel === 'highway') ? levelBackgroundData.highway : levelBackgroundData.pylons;
+            depthBG.forEach(n => {
+                ctx.fillStyle = theme === 'vibrant' ? '#b249f8' : (theme === 'light' ? '#94a3b8' : '#cbd5e1');
+                ctx.globalAlpha = n.alpha;
+                const h = n.relH * canvas.height;
+                const w = n.relW * canvas.width;
+                ctx.fillRect(n.relX * canvas.width, canvas.height - h, w, h);
+            });
         }
         ctx.globalAlpha = 1.0;
 
         // 2. GRID (Utility Layer)
-        if (isGridEnabled && !isSimulating) {
+        if (isGridEnabled) {
             ctx.fillStyle = theme === 'light' ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.18)';
             for (let x = 0; x < canvas.width; x += GRID_SIZE) {
                 for (let y = 0; y < canvas.height; y += GRID_SIZE) {
@@ -888,14 +1255,38 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.fillStyle = p.pier2; ctx.fillRect(px - 35, levelState.bankY + 40, 70, 20);
             });
         } else if (currentLevel === 'mountain') {
-            const drawPeak = (x, y, w, h, color) => {
-                ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x, canvas.height); ctx.lineTo(x + w / 2, y); ctx.lineTo(x + w, canvas.height); ctx.fill();
+            // Helper: fill a triangular mountain peak
+            const drawPeak = (x, peakY, w, color, alpha = 1.0) => {
+                ctx.fillStyle = color;
+                ctx.globalAlpha = alpha;
+                ctx.beginPath();
+                ctx.moveTo(x, canvas.height);
+                ctx.lineTo(x + w / 2, peakY);
+                ctx.lineTo(x + w, canvas.height);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
             };
+
+            // Solid bank fills (flat rectangles)
             ctx.fillStyle = p.riverBank;
-            ctx.fillRect(0, levelState.bankY, levelState.bLeftX, canvas.height); 
+            ctx.fillRect(0, levelState.bankY, levelState.bLeftX, canvas.height);
             ctx.fillRect(levelState.bRightX, levelState.bankYRight, canvas.width, canvas.height);
-            drawPeak(-50, levelState.bankY, levelState.bLeftX + 100, 250, p.mtnColor);
-            drawPeak(levelState.bRightX - 50, levelState.bankYRight, canvas.width - levelState.bRightX + 100, 400, p.mtnColor);
+
+            const bankW = levelState.bLeftX;
+            const rightW = canvas.width - levelState.bRightX;
+
+            // ── LEFT BANK: 4 staggered ridge peaks ──────────────────
+            // Peaks overlap and vary in height to break the flat rectangle top.
+            drawPeak(-bankW * 0.15,  levelState.bankY - canvas.height * 0.08,  bankW * 0.65, p.mtnColor);
+            drawPeak( bankW * 0.20,  levelState.bankY - canvas.height * 0.04,  bankW * 0.60, p.riverBank, 0.9);
+            drawPeak(-bankW * 0.05,  levelState.bankY - canvas.height * 0.12,  bankW * 0.50, p.mtnColor, 0.85);
+            drawPeak( bankW * 0.40,  levelState.bankY - canvas.height * 0.06,  bankW * 0.70, p.mtnColor, 0.7);
+
+            // ── RIGHT BANK: 4 staggered ridge peaks ─────────────────
+            drawPeak(levelState.bRightX - rightW * 0.15, levelState.bankYRight - canvas.height * 0.14, rightW * 0.65, p.mtnColor);
+            drawPeak(levelState.bRightX + rightW * 0.15, levelState.bankYRight - canvas.height * 0.08, rightW * 0.60, p.riverBank, 0.9);
+            drawPeak(levelState.bRightX - rightW * 0.05, levelState.bankYRight - canvas.height * 0.18, rightW * 0.50, p.mtnColor, 0.85);
+            drawPeak(levelState.bRightX + rightW * 0.35, levelState.bankYRight - canvas.height * 0.10, rightW * 0.70, p.mtnColor, 0.7);
         }
 
         // 4. NODES, BEAMS, CAR (Interactive Layer)
@@ -917,15 +1308,60 @@ document.addEventListener('DOMContentLoaded', () => {
             const material = MATERIAL_CONFIG[b.size] || MATERIAL_CONFIG.standard;
             let targetYield = material.yield;
             let stressPrc = Math.min(b.strain / targetYield, 1);
-            if(isSimulating) ctx.strokeStyle = `rgb(${stressPrc * 255}, ${(1-stressPrc)*255}, 0)`;
-            else ctx.strokeStyle = hoveredBeam === b ? '#ef4444' : p.beam;
-            ctx.lineWidth = b.size === 'light' ? 2 : (b.size === 'heavy' ? 7 : 4); ctx.stroke();
+            
+            if(isSimulating) {
+                // Professional Heatmap: Green -> Yellow -> Orange -> Red
+                const hue = (1 - stressPrc) * 120; // 120 is green, 0 is red
+                ctx.strokeStyle = `hsl(${hue}, 100%, 50%)`;
+                if (stressPrc > 0.8) {
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+                }
+            } else {
+                ctx.strokeStyle = hoveredBeam === b ? '#ef4444' : p.beam;
+            }
+            ctx.lineWidth = b.size === 'light' ? 2.5 : (b.size === 'heavy' ? 8 : 4.5);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
             if (isSimulating) {
                 let centerX = (b.nodeA.x + b.nodeB.x) / 2; let centerY = (b.nodeA.y + b.nodeB.y) / 2;
-                ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = stressPrc > 0.85 ? '#ff0000' : '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.shadowColor = "black"; ctx.shadowBlur = 4; ctx.fillText(`${(stressPrc * 100).toFixed(0)}%`, centerX, centerY - Math.max(10, ctx.lineWidth)); ctx.shadowBlur = 0;
+                if (stressPrc > 0.5) {
+                    ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = stressPrc > 0.9 ? '#ff0000' : '#ffffff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.shadowColor = "black"; ctx.shadowBlur = 4;
+                    ctx.fillText(`${(stressPrc * 100).toFixed(0)}%`, centerX, centerY - Math.max(12, ctx.lineWidth)); ctx.shadowBlur = 0;
+                }
             }
         });
+
+        // Diagnostic Ghost View (Pre-simulation Structure)
+        if (ghostStructure && car.state === 'failed') {
+            ctx.globalAlpha = 0.45;
+            ctx.setLineDash([4, 4]);
+            
+            // Theme-aware contrast for the blueprint layer
+            let ghostColor = '#94a3b8'; // Default
+            if (theme === 'light') ghostColor = '#475569';
+            else if (theme === 'vibrant') ghostColor = '#d8b4fe';
+            else ghostColor = '#cbd5e1'; 
+
+            ctx.strokeStyle = ghostColor;
+            ctx.lineWidth = 2;
+            
+            // Draw Ghost Beams
+            ghostStructure.beams.forEach(gb => {
+                ctx.beginPath(); ctx.moveTo(gb.x1, gb.y1); ctx.lineTo(gb.x2, gb.y2); ctx.stroke();
+            });
+            ctx.setLineDash([]);
+            
+            // Draw Ghost Nodes
+            ctx.fillStyle = ghostColor;
+            ghostStructure.nodes.forEach(gn => {
+                ctx.beginPath(); ctx.arc(gn.x, gn.y, 3, 0, Math.PI * 2); ctx.fill();
+            });
+            
+            ctx.globalAlpha = 1.0;
+        }
 
         nodes.forEach(n => {
             ctx.beginPath(); ctx.arc(n.x, n.y, n.fixed ? 6 : 4, 0, Math.PI * 2);
@@ -935,8 +1371,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (car.active || (!isSimulating && car.x > 0)) {
             let wheelRot = car.x * 0.1; 
-            let bounceY = car.y + (car.active && car.speed > 0 ? Math.abs(Math.sin(car.x * 0.15)) * 1.5 : 0);
-            if (car.active && car.speed > 0) {
+            let bounceY = car.y + (car.active && car.state === 'driving' ? Math.abs(Math.sin(car.x * 0.15)) * 1.5 : 0);
+            
+            ctx.save();
+            ctx.translate(car.x + 20, bounceY - 10);
+            ctx.rotate(car.rotation);
+            ctx.translate(-(car.x + 20), -(bounceY - 10));
+
+            if (car.active && car.speed > 0 && car.state === 'driving') {
                 ctx.fillStyle = `rgba(150, 150, 150, 0.4)`; ctx.beginPath();
                 ctx.arc(car.x - 15, car.y - 5 + Math.sin(car.x*0.5)*3, 6, 0, Math.PI*2); ctx.fill();
                 ctx.arc(car.x - 22, car.y - 10 + Math.cos(car.x*0.4)*5, 10, 0, Math.PI*2); ctx.fill();
@@ -953,6 +1395,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(0, 6); ctx.stroke(); ctx.restore();
             };
             drawWheel(car.x + 6, car.y - 2, wheelRot); drawWheel(car.x + 32, car.y - 2, wheelRot);
+            ctx.restore();
         }
 
         if (mousePos.x > 0 && mousePos.y > 0 && !isSimulating && operationMode !== 'delete') {
@@ -962,9 +1405,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (firstBrokenBeam && car.state === 'failed') {
-            ctx.beginPath(); ctx.arc(brokeAtX, brokeAtY, 20, 0, Math.PI * 2); ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3; ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(brokeAtX - 10, brokeAtY - 10); ctx.lineTo(brokeAtX + 10, brokeAtY + 10); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(brokeAtX + 10, brokeAtY - 10); ctx.lineTo(brokeAtX - 10, brokeAtY + 10); ctx.stroke();
+            const pulse = (Math.sin(Date.now() * 0.01) + 1) * 5;
+            ctx.beginPath(); ctx.arc(brokeAtX, brokeAtY, 20 + pulse, 0, Math.PI * 2); 
+            ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3; ctx.shadowBlur = 10; ctx.shadowColor = '#ef4444'; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(brokeAtX - 12, brokeAtY - 12); ctx.lineTo(brokeAtX + 12, brokeAtY + 12); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(brokeAtX + 12, brokeAtY - 12); ctx.lineTo(brokeAtX - 12, brokeAtY + 12); ctx.stroke();
+            ctx.shadowBlur = 0;
         }
     }
 
@@ -979,82 +1425,53 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Buttons ---
-    document.getElementById('btn-save-checkpoint')?.addEventListener('click', () => {
-        if(isSimulating) return;
-        checkpointData.nodes = nodes.map(n => {
-            let relX = (n.x - levelState.bLeftX) / levelState.gapWidth;
-            let expectedBankY = levelState.isAsymmetric 
-                ? levelState.bankY + relX * (levelState.bankYRight - levelState.bankY)
-                : levelState.bankY;
-            return {
-                relX: relX,
-                relY: (n.y - expectedBankY) / levelState.gapWidth,
-                fixed: n.fixed
-            };
-        });
-        checkpointData.beams = beams.map(b => ({
-            idxA: nodes.indexOf(b.nodeA),
-            idxB: nodes.indexOf(b.nodeB),
-            size: b.size
-        }));
-        showGameStatus(true, 'Checkpoint Saved!');
-        setTimeout(() => statusBanner.classList.add('hidden'), 2000);
-    });
+    document.getElementById('btn-save-checkpoint')?.addEventListener('click', performSave);
 
     document.getElementById('btn-restore-checkpoint')?.addEventListener('click', () => {
-        if (checkpointData.nodes.length === 0) {
-            showGameStatus(false, 'No checkpoint found!');
+        const success = performRestore(currentLevel);
+        if (!success) {
+            showPuzzleStatus(false, 'No saved structure for this level!');
             setTimeout(() => statusBanner.classList.add('hidden'), 2000);
-            return;
         }
-        isSimulating = false;
-        if(animFrame) cancelAnimationFrame(animFrame);
-        car.active = false;
-        car.state = 'idle';
-        firstBrokenBeam = null;
-        statusBanner.classList.add('hidden');
-        
-        nodes = checkpointData.nodes.map(n => {
-            let absoluteX = levelState.bLeftX + (n.relX * levelState.gapWidth);
-            let expectedBankY = levelState.isAsymmetric 
-                ? levelState.bankY + n.relX * (levelState.bankYRight - levelState.bankY)
-                : levelState.bankY;
-            let absoluteY = expectedBankY + (n.relY * levelState.gapWidth);
-            return new Node(absoluteX, absoluteY, n.fixed);
-        });
-        beams = checkpointData.beams.map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size));
-        
-        car.x = nodes[0].x - 50; 
-        car.y = nodes[0].y - 15;
-        car.speed = 1.5;
-        
-        updateBudgetUI();
-        draw();
     });
 
     document.getElementById('btn-reset').addEventListener('click', () => {
-        saveHistory();
-        initEnvironment();
+        // Force blank slate (passing false to initEnvironment)
+        initEnvironment(false);
+        setSimulatingUI(false);
     });
 
     document.getElementById('btn-simulate').addEventListener('click', () => {
-        if(!isSimulating) {
+        // Allow Restart if not simulating OR if already failed/passed (Visual Review phase)
+        if(!isSimulating || car.state === 'failed' || car.state === 'passed') {
             updateBudgetUI(); // One last check
             if (budget - currentSpend < 0 && budget < 1000000) {
-                showGameStatus(false, 'Cannot test: You are over budget! Delete beams.');
+                showPuzzleStatus(false, 'Cannot test: You are over budget! Delete beams.');
                 return;
             }
-            if (nodes.length > 0) {
-                car.x = nodes[0].x - 50;
-                car.y = nodes[0].y - 15;
-                car.speed = 1.5;
-            }
-
             isSimulating = true;
             statusBanner.classList.add('hidden');
+            resetVehicleToStart();
             car.active = true;
             car.state = 'driving';
+            firstBrokenBeam = null;
+            brokeAtX = 0; brokeAtY = 0; brokeStrain = 0;
+            
+            // Capture Ghost State for post-mortem analysis
+            ghostStructure = {
+                nodes: nodes.map(n => ({ x: n.x, y: n.y })),
+                beams: beams.map(b => ({
+                    x1: b.nodeA.x, y1: b.nodeA.y,
+                    x2: b.nodeB.x, y2: b.nodeB.y,
+                    midX: (b.nodeA.x + b.nodeB.x) / 2,
+                    midY: (b.nodeA.y + b.nodeB.y) / 2
+                }))
+            };
+
+            // Reset beam state from any previous run
+            beams.forEach(b => { b.broken = false; b.strain = 0; });
             nodes.forEach(n => { n.oldX = n.x; n.oldY = n.y; });
+            setSimulatingUI(true); // Lock all tool buttons while simulation runs
             simulate();
         }
     });
@@ -1072,9 +1489,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Boot
+    // Boot — explicit full init on first load (keepLevel = false → calls initEnvironment)
     setTimeout(() => {
-        resizeCanvas();
+        resizeCanvas(false);
         updateUndoButtons();
     }, 100);
 });

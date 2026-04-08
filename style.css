@@ -259,6 +259,7 @@ a { text-decoration: none; color: inherit; }
 .btn-glow:hover { box-shadow: 0 0 20px var(--glow); transform: translateY(-4px) scale(1.02); background: var(--accent-hover); }
 .btn.outline { background: transparent; border-color: var(--border-color); color: var(--text-primary); }
 .btn.outline:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-4px); }
+.btn-static:hover { transform: none !important; }
 .btn.minimal { padding: 0.5rem 1.5rem; font-size: 0.9rem; }
 
 .section-image { width: 500px; display: flex; flex-direction: column; }
@@ -496,22 +497,33 @@ a { text-decoration: none; color: inherit; }
 }
 
 /* Fullscreen adjustments */
-.game-container:fullscreen, 
-.game-container:-webkit-full-screen { 
-    width: 100vw; height: 100vh; border-radius: 0; border: none; 
-    display: flex; flex-direction: column; align-items: center; justify-content: center; 
-    background: #000; margin-top: 0; cursor: auto !important; 
+.game-container:fullscreen,
+.game-container:-webkit-full-screen {
+    width: 100vw; height: 100vh; border-radius: 0; border: none;
+    display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start;
+    background: #000; margin-top: 0; cursor: auto !important;
+    position: relative; /* Required so the overlay can cover with position:absolute */
 }
-.game-container:fullscreen button, 
-.game-container:-webkit-full-screen button, 
-.game-container:fullscreen select, 
+.game-container:fullscreen button,
+.game-container:-webkit-full-screen button,
+.game-container:fullscreen select,
 .game-container:-webkit-full-screen select { cursor: pointer !important; }
 
-.game-container:fullscreen .bridge-canvas, 
-.game-container:-webkit-full-screen .bridge-canvas { flex-grow: 0; width: 100%; max-height: 80vh; aspect-ratio: 2 / 1; height: auto; }
+/* Canvas fills all remaining height after the toolbar — no black bars.
+   min-height:0 is the correct flex pattern for a child to shrink below
+   its content size; height:0 was causing getBoundingClientRect to return
+   0 making initEnvironment compute bankY=0 (terrain at top of canvas). */
+.game-container:fullscreen .bridge-canvas,
+.game-container:-webkit-full-screen .bridge-canvas {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    max-height: none;
+    aspect-ratio: unset;
+}
 
-.game-container:fullscreen .game-ui, 
-.game-container:-webkit-full-screen .game-ui { width: 100%; max-width: 1200px; border-radius: 0; }
+.game-container:fullscreen .game-ui,
+.game-container:-webkit-full-screen .game-ui { width: 100%; max-width: none; border-radius: 0; }
 
 /* Status Banner */
 .game-status {
@@ -716,3 +728,73 @@ footer { padding: 4rem 0; border-top: 1px solid var(--border-color); background:
     .contact-card p { font-size: 1rem; margin-bottom: 1rem; }
     .contact-card button { padding: 0.9rem 2.5rem; font-size: 1rem; }
 }
+
+/* =========================================
+   NEW: Toast Notifications
+   ========================================= */
+#toast-container {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    z-index: 10000;
+    pointer-events: none;
+}
+
+.toast {
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    padding: 0.8rem 1.2rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    transform: translateX(120%);
+    transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+    opacity: 0;
+    max-width: 300px;
+    pointer-events: auto;
+}
+
+.toast.visible {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.toast-icon {
+    width: 24px;
+    height: 24px;
+    background: var(--accent);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.toast-msg {
+    font-size: 0.9rem;
+    color: var(--text);
+    line-height: 1.4;
+}
+
+/* =========================================
+   NEW: Magnetic Buttons
+   ========================================= */
+.btn-magnetic {
+    transition: transform 0.2s ease-out;
+}
+
+.btn-magnetic span, 
+.btn-magnetic i {
+    display: inline-block;
+    transition: transform 0.25s linear;
+}
+

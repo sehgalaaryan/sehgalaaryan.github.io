@@ -18,6 +18,8 @@ function initApp() {
     AnimationEngine.init();
     ProjectShowcase.init();
     ContactForm.init();
+    ToastManager.init();
+    MagneticEffect.init();
 
     // Resize Handling
     window.addEventListener('resize', debounce(() => {
@@ -489,7 +491,71 @@ const ProjectShowcase = {
 };
 
 // =========================================
-// 6. Contact Form
+// 6. Toast Manager
+// =========================================
+const ToastManager = {
+    container: null,
+
+    init() {
+        this.container = document.createElement('div');
+        this.container.id = 'toast-container';
+        document.body.appendChild(this.container);
+        window.showToast = (msg, type) => this.show(msg, type);
+    },
+
+    show(msg, type = 'success') {
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.innerHTML = `
+            <div class="toast-icon">${type === 'success' ? '✓' : 'ℹ'}</div>
+            <div class="toast-msg">${msg}</div>
+        `;
+        this.container.appendChild(toast);
+
+        // Animate in
+        requestAnimationFrame(() => toast.classList.add('visible'));
+
+        // Auto remove
+        setTimeout(() => {
+            toast.classList.remove('visible');
+            setTimeout(() => toast.remove(), 400);
+        }, 3000);
+    }
+};
+
+// =========================================
+// 7. Magnetic Effect
+// =========================================
+const MagneticEffect = {
+    init() {
+        if (window.innerWidth <= 900) return;
+        
+        document.querySelectorAll('.btn-magnetic').forEach(btn => {
+            btn.addEventListener('mousemove', e => {
+                const rect = btn.getBoundingClientRect();
+                const x = e.clientX - rect.left - rect.width / 2;
+                const y = e.clientY - rect.top - rect.height / 2;
+                
+                // Pull content (text/icon) more than the button itself
+                const content = btn.querySelector('span, i') || btn;
+                
+                btn.style.transform = `translate(${x * 0.15}px, ${y * 0.15}px)`;
+                if (content !== btn) {
+                    content.style.transform = `translate(${x * 0.1}px, ${y * 0.1}px)`;
+                }
+            });
+            
+            btn.addEventListener('mouseleave', () => {
+                const content = btn.querySelector('span, i') || btn;
+                btn.style.transform = '';
+                if (content !== btn) content.style.transform = '';
+            });
+        });
+    }
+};
+
+// =========================================
+// 8. Contact Form
 // =========================================
 const ContactForm = {
     init() {
@@ -502,6 +568,11 @@ const ContactForm = {
                 const mail = 'aaryan.sehgal.3070@gmail.com';
                 const subject = encodeURIComponent('Inquiry from Portfolio');
                 window.location.href = `mailto:${mail}?subject=${subject}&body=${body}`;
+                
+                // Enhanced user feedback
+                if (window.showToast) {
+                    window.showToast('Opening default email client...', 'success');
+                }
             });
         }
     }
