@@ -26,6 +26,7 @@ function initApp() {
         AnimationEngine.cacheSectionOffsets();
         AnimationEngine.updateScrollScrub();
         AnimationEngine.updateHorizontalScroll();
+        AnimationEngine.updateCardGlowAtPointer();
         ThemeManager.updateSlider();
     }, 150));
 }
@@ -92,6 +93,7 @@ const NavigationManager = {
             const isOpen = this.menu.classList.toggle('open');
             this.toggle.classList.toggle('active');
             this.toggle.setAttribute('aria-expanded', isOpen);
+            AnimationEngine.updateNavbar();
         });
 
         document.querySelectorAll('.nav-item').forEach(link => {
@@ -99,6 +101,7 @@ const NavigationManager = {
                 this.menu.classList.remove('open');
                 this.toggle.classList.remove('active');
                 this.toggle.setAttribute('aria-expanded', 'false');
+                AnimationEngine.updateNavbar();
             });
         });
     }
@@ -168,6 +171,121 @@ const AnimationEngine = {
     ticking: false,
     lastScrollY: 0,
     sectionOffsets: [],
+    reducedMotionQuery: window.matchMedia('(prefers-reduced-motion: reduce)'),
+    pointerState: { active: false, x: 0, y: 0 },
+    activeGlowCard: null,
+
+    isCompactLayout() {
+        return window.innerWidth <= 1024;
+    },
+
+    usesSimplifiedHorizontalLayout() {
+        return window.innerWidth <= 1024 || window.innerHeight <= 820;
+    },
+
+    prefersReducedMotion() {
+        return this.reducedMotionQuery.matches;
+    },
+
+    resetPanoramaCards(scope = document) {
+        scope.querySelectorAll('.project-card, .skill-card').forEach(card => {
+            card.style.setProperty('--panorama-rotate', '0deg');
+            card.style.setProperty('--panorama-shift-y', '0px');
+            card.style.setProperty('--panorama-z', '0px');
+            card.style.setProperty('--panorama-scale', '1');
+            card.dataset.panoramaLayer = '1';
+            card.style.setProperty('--card-layer', '1');
+            card.style.setProperty('--card-opacity', '1');
+            card.style.setProperty('--card-saturate', '1');
+        });
+    },
+
+    updatePanoramaCards(track) {
+        const viewportCenter = window.innerWidth / 2;
+        const spread = Math.max(window.innerWidth * 0.42, 320);
+
+        track.querySelectorAll('.project-card, .skill-card').forEach(card => {
+            const rect = card.getBoundingClientRect();
+            const cardCenter = rect.left + (rect.width / 2);
+            const normalized = Math.max(-1, Math.min(1, (cardCenter - viewportCenter) / spread));
+            const proximity = 1 - Math.abs(normalized);
+            const layer = Math.round(10 + (proximity * 30));
+
+            card.style.setProperty('--panorama-rotate', `${normalized * -14}deg`);
+            card.style.setProperty('--panorama-shift-y', `${(1 - proximity) * 18}px`);
+            card.style.setProperty('--panorama-z', `${Math.round((proximity * 34) - 10)}px`);
+            card.style.setProperty('--panorama-scale', `${(0.9 + (proximity * 0.12)).toFixed(3)}`);
+            card.dataset.panoramaLayer = String(layer);
+            if (!card.classList.contains('glow-active')) {
+                card.style.setProperty('--card-layer', String(layer));
+            }
+            card.style.setProperty('--card-opacity', `${(0.68 + (proximity * 0.32)).toFixed(3)}`);
+            card.style.setProperty('--card-saturate', `${(0.84 + (proximity * 0.26)).toFixed(3)}`);
+        });
+    },
+
+    resetGlowCard(card) {
+        if (!card) return;
+        card.classList.remove('glow-active');
+        card.style.setProperty('--card-layer', card.dataset.panoramaLayer || '1');
+        card.style.setProperty('--hover-x', '50%');
+        card.style.setProperty('--hover-y', '50%');
+        card.style.setProperty('--shine-offset', '0px');
+    },
+
+    pickCardAtPoint(x, y) {
+        const candidates = Array.from(document.querySelectorAll('.project-card, .skill-card')).filter(card => {
+            const rect = card.getBoundingClientRect();
+            return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+        });
+
+        if (candidates.length === 0) return null;
+
+        candidates.sort((a, b) => {
+            const rectA = a.getBoundingClientRect();
+            const rectB = b.getBoundingClientRect();
+            const distA = Math.hypot((rectA.left + rectA.width / 2) - x, (rectA.top + rectA.height / 2) - y);
+            const distB = Math.hypot((rectB.left + rectB.width / 2) - x, (rectB.top + rectB.height / 2) - y);
+            if (Math.abs(distA - distB) > 0.5) return distA - distB;
+
+            return Number(b.dataset.panoramaLayer || 0) - Number(a.dataset.panoramaLayer || 0);
+        });
+
+        return candidates[0];
+    },
+
+    updateCardGlowAtPointer() {
+        if (this.isCompactLayout() || this.prefersReducedMotion() || !this.pointerState.active) {
+            this.resetGlowCard(this.activeGlowCard);
+            this.activeGlowCard = null;
+            return;
+        }
+
+        const card = this.pickCardAtPoint(this.pointerState.x, this.pointerState.y);
+
+        if (this.activeGlowCard && this.activeGlowCard !== card) {
+            this.resetGlowCard(this.activeGlowCard);
+        }
+
+        if (!card) {
+            this.activeGlowCard = null;
+            return;
+        }
+
+        const rect = card.getBoundingClientRect();
+        const relX = Math.max(0, Math.min(rect.width, this.pointerState.x - rect.left));
+        const relY = Math.max(0, Math.min(rect.height, this.pointerState.y - rect.top));
+        const xPercent = (relX / rect.width) * 100;
+        const yPercent = (relY / rect.height) * 100;
+        const shineOffset = ((relX / rect.width) - 0.5) * 24;
+
+        card.classList.add('glow-active');
+        card.style.setProperty('--card-layer', '80');
+        card.style.setProperty('--hover-x', `${xPercent.toFixed(2)}%`);
+        card.style.setProperty('--hover-y', `${yPercent.toFixed(2)}%`);
+        card.style.setProperty('--shine-offset', `${shineOffset.toFixed(2)}px`);
+        this.activeGlowCard = card;
+    },
 
     init() {
         this.lastScrollY = window.scrollY;
@@ -175,6 +293,7 @@ const AnimationEngine = {
         this.cacheSectionOffsets();
         this.initTypewriter();
         this.init3DTilt();
+        this.initCardGlowTracking();
         this.initDescriptionScroll();
 
         window.addEventListener('scroll', () => {
@@ -182,6 +301,7 @@ const AnimationEngine = {
                 window.requestAnimationFrame(() => {
                     this.updateScrollScrub();
                     this.updateHorizontalScroll();
+                    this.updateCardGlowAtPointer();
                     this.updateNavbar();
                     this.ticking = false;
                 });
@@ -190,6 +310,9 @@ const AnimationEngine = {
         });
 
         this.updateScrollScrub();
+        this.updateHorizontalScroll();
+        this.updateCardGlowAtPointer();
+        this.updateNavbar();
     },
 
     initDescriptionScroll() {
@@ -256,6 +379,10 @@ const AnimationEngine = {
         navLinks.forEach(link => {
             link.classList.toggle('active', link.getAttribute('href') === `#${currentSection}`);
         });
+
+        const navMenu = NavigationManager.menu || document.getElementById('nav-menu');
+        const shouldHideForPuzzle = currentSection === 'puzzle' && !navMenu?.classList.contains('open');
+        navbar.classList.toggle('puzzle-hidden', shouldHideForPuzzle);
     },
 
     initTypewriter() {
@@ -293,6 +420,14 @@ const AnimationEngine = {
     },
 
     updateScrollScrub() {
+        if (this.isCompactLayout() || this.prefersReducedMotion()) {
+            this.scrubTargets.forEach(el => {
+                el.style.opacity = '1';
+                el.style.transform = 'none';
+            });
+            return;
+        }
+
         const wh = window.innerHeight;
         this.scrubTargets.forEach(el => {
             const rect = el.getBoundingClientRect();
@@ -322,6 +457,23 @@ const AnimationEngine = {
 
     updateHorizontalScroll() {
         const sections = document.querySelectorAll('.horizontal-section');
+
+        if (this.usesSimplifiedHorizontalLayout() || this.prefersReducedMotion()) {
+            sections.forEach(section => {
+                const track = section.querySelector('.horizontal-track') || section.querySelector('.reverse-track');
+                const progressBar = section.querySelector('.scroll-progress-bar');
+                const stickyContainer = section.querySelector('.sticky-container');
+
+                if (track) track.style.transform = 'none';
+                if (progressBar) progressBar.style.width = '0%';
+                if (stickyContainer) stickyContainer.classList.remove('bg-focus');
+                this.resetPanoramaCards(section);
+            });
+            this.resetGlowCard(this.activeGlowCard);
+            this.activeGlowCard = null;
+            return;
+        }
+
         sections.forEach(section => {
             const track = section.querySelector('.horizontal-track') || section.querySelector('.reverse-track');
             const progressBar = section.querySelector('.scroll-progress-bar');
@@ -336,13 +488,14 @@ const AnimationEngine = {
             progress = Math.max(0, Math.min(1, progress));
             
             // Calculate max scroll distance dynamically bounding to the new CSS padded edges.
-            const maxScrollDist = track.scrollWidth - window.innerWidth;
+            const maxScrollDist = Math.max(track.scrollWidth - window.innerWidth, 0);
             
             // Multiply by positive 1 for reverse-tracks, pulling the UI horizontally left-to-right.
             const isReverse = track.classList.contains('reverse-track');
             const direction = isReverse ? 1 : -1;
             
             track.style.transform = `translateX(${direction * progress * maxScrollDist}px)`;
+            this.updatePanoramaCards(track);
             
             // Background Dimming Animation
             const stickyContainer = section.querySelector('.sticky-container');
@@ -364,19 +517,42 @@ const AnimationEngine = {
     },
 
     init3DTilt() {
-        if (window.innerWidth <= 900) return;
-        document.querySelectorAll('.hover-3d').forEach(card => {
+        if (window.innerWidth <= 1024 || this.prefersReducedMotion()) return;
+        document.querySelectorAll('.hover-3d:not(.project-card):not(.skill-card)').forEach(card => {
             card.addEventListener('mousemove', e => {
                 const rect = card.getBoundingClientRect();
-                const rx = ((e.clientY - rect.top - rect.height / 2) / (rect.height / 2)) * -10;
-                const ry = ((e.clientX - rect.left - rect.width / 2) / (rect.width / 2)) * 10;
-                card.style.transform = `perspective(1000px) rotateX(${rx}deg) rotateY(${ry}deg) scale3d(1.02, 1.02, 1.02)`;
-                card.style.transition = 'none';
+                const rx = ((e.clientY - rect.top - rect.height / 2) / (rect.height / 2)) * -3;
+                const ry = ((e.clientX - rect.left - rect.width / 2) / (rect.width / 2)) * 3;
+                card.style.setProperty('--hover-rotate-x', `${rx}deg`);
+                card.style.setProperty('--hover-rotate-y', `${ry}deg`);
+                card.style.setProperty('--hover-scale', '1.003');
+                card.style.transition = 'transform 0.18s ease-out, border-color 0.22s ease, opacity 0.35s ease, filter 0.35s ease';
             });
             card.addEventListener('mouseleave', () => {
-                card.style.transition = 'transform 0.5s ease';
-                this.updateScrollScrub();
+                card.style.transition = '';
+                card.style.setProperty('--hover-rotate-x', '0deg');
+                card.style.setProperty('--hover-rotate-y', '0deg');
+                card.style.setProperty('--hover-scale', '1');
             });
+        });
+    },
+
+    initCardGlowTracking() {
+        if (window.innerWidth <= 1024 || this.prefersReducedMotion()) return;
+
+        document.querySelectorAll('.project-card, .skill-card').forEach(card => this.resetGlowCard(card));
+
+        window.addEventListener('pointermove', (e) => {
+            this.pointerState.active = true;
+            this.pointerState.x = e.clientX;
+            this.pointerState.y = e.clientY;
+            this.updateCardGlowAtPointer();
+        }, { passive: true });
+
+        document.addEventListener('pointerleave', () => {
+            this.pointerState.active = false;
+            this.resetGlowCard(this.activeGlowCard);
+            this.activeGlowCard = null;
         });
     }
 };
@@ -387,6 +563,34 @@ const AnimationEngine = {
 const ProjectShowcase = {
     modal: null,
     closeBtn: null,
+
+    usesSimpleModalFlow() {
+        return window.innerWidth <= 1024
+            || window.innerHeight <= 820
+            || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    },
+
+    pickProjectCardAtPoint(x, y) {
+        const candidates = Array.from(document.querySelectorAll('.project-card')).filter(card => {
+            const rect = card.getBoundingClientRect();
+            return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+        });
+
+        if (candidates.length === 0) return null;
+
+        candidates.sort((a, b) => {
+            const rectA = a.getBoundingClientRect();
+            const rectB = b.getBoundingClientRect();
+            const distA = Math.hypot((rectA.left + rectA.width / 2) - x, (rectA.top + rectA.height / 2) - y);
+            const distB = Math.hypot((rectB.left + rectB.width / 2) - x, (rectB.top + rectB.height / 2) - y);
+
+            if (Math.abs(distA - distB) > 0.5) return distA - distB;
+
+            return Number(b.dataset.panoramaLayer || 0) - Number(a.dataset.panoramaLayer || 0);
+        });
+
+        return candidates[0];
+    },
     
     init() {
         this.modal = document.getElementById('project-modal');
@@ -396,16 +600,20 @@ const ProjectShowcase = {
 
         if (!this.modal) return;
 
-        document.querySelectorAll('.project-card').forEach(card => {
-            card.addEventListener('click', (e) => {
+        const portfolioSection = document.getElementById('portfolio');
+        if (portfolioSection) {
+            portfolioSection.addEventListener('click', (e) => {
+                const card = this.pickProjectCardAtPoint(e.clientX, e.clientY);
+                if (!card || !portfolioSection.contains(card)) return;
+
                 this.lastCard = card;
                 const title = card.querySelector('h3').innerText;
                 const desc = card.querySelector('p').innerText;
                 const img = card.getAttribute('data-project-img') || 'project-placeholder.jpg';
-                
+
                 this.openModal(title, desc, img);
             });
-        });
+        }
 
         if (this.closeBtn) {
             this.closeBtn.addEventListener('click', () => this.closeModal());
@@ -425,7 +633,22 @@ const ProjectShowcase = {
         // 1. Prep Modal Content
         document.getElementById('modal-title').textContent = title;
         document.getElementById('modal-description').textContent = desc;
-        document.getElementById('modal-image').src = imgSrc;
+        const modalImage = document.getElementById('modal-image');
+        if (modalImage) {
+            modalImage.src = imgSrc;
+            modalImage.alt = `${title} preview`;
+        }
+
+        if (this.usesSimpleModalFlow()) {
+            this.modal.style.display = 'flex';
+            this.modal.style.visibility = 'visible';
+            this.modal.classList.add('open');
+            this.content.style.transition = '';
+            this.content.style.transform = 'none';
+            this.content.style.opacity = '1';
+            document.body.style.overflow = 'hidden';
+            return;
+        }
 
         // 2. FIRST: Record Card Position
         const cardRect = this.lastCard.getBoundingClientRect();
@@ -464,6 +687,16 @@ const ProjectShowcase = {
     closeModal() {
         if (!this.lastCard) {
             this.modal.classList.remove('open');
+            return;
+        }
+
+        if (this.usesSimpleModalFlow()) {
+            this.modal.classList.remove('open');
+            this.modal.style.display = 'none';
+            this.modal.style.visibility = '';
+            this.content.style.transform = '';
+            this.content.style.opacity = '';
+            document.body.style.overflow = '';
             return;
         }
 
@@ -507,7 +740,7 @@ const ToastManager = {
         const toast = document.createElement('div');
         toast.className = `toast toast-${type}`;
         toast.innerHTML = `
-            <div class="toast-icon">${type === 'success' ? '✓' : 'ℹ'}</div>
+            <div class="toast-icon">${type === 'success' ? '&#10003;' : '&#9432;'}</div>
             <div class="toast-msg">${msg}</div>
         `;
         this.container.appendChild(toast);
@@ -528,7 +761,7 @@ const ToastManager = {
 // =========================================
 const MagneticEffect = {
     init() {
-        if (window.innerWidth <= 900) return;
+        if (window.innerWidth <= 1024 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
         
         document.querySelectorAll('.btn-magnetic').forEach(btn => {
             btn.addEventListener('mousemove', e => {

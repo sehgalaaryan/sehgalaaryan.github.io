@@ -16,16 +16,25 @@ document.addEventListener('DOMContentLoaded', () => {
     // call initEnvironment — that would wipe the user's structure.
     let isFullscreenTransitioning = false;
 
-    function resizeCanvas(keepLevel) {
+    function resizeCanvas(preserveStructure = false) {
         if (!canvas.parentElement) return;
         if (isSimulating) return; // Never corrupt physics mid-run
         if (isFullscreenTransitioning) return; // Ignore resize events from fullscreen toggle
+
+        const snapshot = preserveStructure && nodes.length > 0 ? captureRelativeDesign() : null;
+
         canvas.width = canvas.parentElement.clientWidth;
         canvas.height = canvas.clientHeight || (canvas.width * 0.5);
-        if (!keepLevel) initEnvironment();
-        else if (nodes.length > 0) draw();
+
+        initEnvironment(false);
+
+        if (snapshot) {
+            restoreRelativeDesign(snapshot);
+        } else if (nodes.length > 0) {
+            draw();
+        }
     }
-    window.addEventListener('resize', () => resizeCanvas(false));
+    window.addEventListener('resize', () => resizeCanvas(true));
 
     // Simulation Data
     let nodes = [];
@@ -37,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Puzzle Economy Data
     let budget = 15000;
     let currentSpend = 0;
+    const UNLIMITED_BUDGET = 999999999;
 
     // Interaction State
     let hoveredNode = null;
@@ -99,6 +109,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Vehicle Data
     let car = { active: false, x: 0, y: 0, vy: 0, rotation: 0, speed: 1.5, state: 'idle' };
 
+    function isUnlimitedBudget() {
+        return budget >= UNLIMITED_BUDGET;
+    }
+
     function resetVehicleToStart() {
         car.x = levelState.bLeftX - 50;
         if (currentLevel === 'mountain') {
@@ -148,7 +162,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 saveBtn.disabled = true;
                 saveBtn.style.opacity = '0.4';
                 saveBtn.style.pointerEvents = 'none';
-                saveBtn.title = 'Cannot save — structure has collapsed';
+                saveBtn.title = 'Cannot save - structure has collapsed';
             }
             if (simBtn) {
                  simBtn.disabled = true;
@@ -431,8 +445,16 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     function onDesignChange() {
-        if (!isSimulating && car.state === 'failed') {
-            car.state = 'idle'; // Transition out of failed state to enable UI
+        if (!isSimulating && (car.state === 'failed' || car.state === 'passed')) {
+            restoreGhostNodePositions();
+            resetVehicleToStart();
+            ghostStructure = null;
+            firstBrokenBeam = null;
+            brokeAtX = 0;
+            brokeAtY = 0;
+            brokeStrain = 0;
+            statusBanner.classList.add('hidden');
+            isSimulating = false;
             setSimulatingUI(false);
             draw();
         }
@@ -461,6 +483,18 @@ document.addEventListener('DOMContentLoaded', () => {
         beams = snapshot.beams
             .filter(b => b.idxA >= 0 && b.idxB >= 0 && b.idxA < nodes.length && b.idxB < nodes.length)
             .map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size, !!b.isRoad));
+
+        if (!isSimulating && (car.state === 'failed' || car.state === 'passed')) {
+            resetVehicleToStart();
+            ghostStructure = null;
+            firstBrokenBeam = null;
+            brokeAtX = 0;
+            brokeAtY = 0;
+            brokeStrain = 0;
+            statusBanner.classList.add('hidden');
+            setSimulatingUI(false);
+        }
+
         updateBudgetUI();
         draw();
     }
@@ -538,18 +572,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function performSave() {
-        if(isSimulating) return;
-        const design = {
-            nodes: nodes.map(n => {
-                let relX = (n.x - levelState.bLeftX) / levelState.gapWidth;
-                let expectedBankY = levelState.isAsymmetric 
+    function restoreGhostNodePositions() {
+        if (!ghostStructure?.nodes || ghostStructure.nodes.length !== nodes.length) {
+            return;
+        }
+
+        ghostStructure.nodes.forEach((savedNode, index) => {
+            const node = nodes[index];
+            if (!node) return;
+
+            node.x = savedNode.x;
+            node.y = savedNode.y;
+            node.oldX = savedNode.x;
+            node.oldY = savedNode.y;
+
+            if (typeof savedNode.fixed === 'boolean') {
+                node.fixed = savedNode.fixed;
+            }
+        });
+
+        beams.forEach(beam => {
+            beam.broken = false;
+            beam.strain = 0;
+        });
+    }
+
+    function captureRelativeDesign() {
+        const sourceNodes = (
+            ghostStructure &&
+            (car.state === 'failed' || car.state === 'passed') &&
+            ghostStructure.nodes &&
+            ghostStructure.nodes.length === nodes.length
+        ) ? ghostStructure.nodes : nodes;
+
+        return {
+            nodes: sourceNodes.map(n => {
+                const relX = levelState.gapWidth > 0 ? (n.x - levelState.bLeftX) / levelState.gapWidth : 0;
+                const bankYAtX = levelState.isAsymmetric
                     ? levelState.bankY + relX * (levelState.bankYRight - levelState.bankY)
                     : levelState.bankY;
+
                 return {
-                    relX: relX,
-                    relY: (n.y - expectedBankY) / levelState.gapWidth,
-                    fixed: n.fixed
+                    relX,
+                    relY: levelState.gapWidth > 0 ? (n.y - bankYAtX) / levelState.gapWidth : 0,
+                    fixed: !!n.fixed
                 };
             }),
             beams: beams.map(b => ({
@@ -559,6 +625,50 @@ document.addEventListener('DOMContentLoaded', () => {
                 isRoad: !!b.isRoad
             }))
         };
+    }
+
+    function restoreRelativeDesign(design) {
+        if (!design || !design.nodes || design.nodes.length === 0) {
+            return false;
+        }
+
+        isSimulating = false;
+        if (animFrame) cancelAnimationFrame(animFrame);
+
+        hoveredNode = null;
+        hoveredBeam = null;
+        draggingStartNode = null;
+        ghostStructure = null;
+        helpBlueprint = null;
+        firstBrokenBeam = null;
+        brokeAtX = 0;
+        brokeAtY = 0;
+        brokeStrain = 0;
+        statusBanner.classList.add('hidden');
+
+        nodes = design.nodes.map(n => {
+            const absX = levelState.bLeftX + (n.relX * levelState.gapWidth);
+            const bankYAtX = levelState.isAsymmetric
+                ? levelState.bankY + n.relX * (levelState.bankYRight - levelState.bankY)
+                : levelState.bankY;
+            const absY = bankYAtX + (n.relY * levelState.gapWidth);
+            return new Node(absX, absY, n.fixed);
+        });
+
+        beams = design.beams
+            .filter(b => b.idxA >= 0 && b.idxB >= 0 && b.idxA < nodes.length && b.idxB < nodes.length)
+            .map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size, !!b.isRoad));
+
+        resetVehicleToStart();
+        updateBudgetUI();
+        setSimulatingUI(false);
+        draw();
+        return true;
+    }
+
+    function performSave() {
+        if(isSimulating) return;
+        const design = captureRelativeDesign();
         saveToPersistentStorage(currentLevel, design);
         updateRestoreButtonState();
         if (window.showToast) {
@@ -572,34 +682,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function performRestore(levelId) {
         const saves = getPersistentSaves();
         const design = saves[levelId];
-        if (!design || !design.nodes || design.nodes.length === 0) {
-            return false;
-        }
-        
-        isSimulating = false;
-        if(animFrame) cancelAnimationFrame(animFrame);
-        car.active = false; car.state = 'idle';
-        firstBrokenBeam = null; statusBanner.classList.add('hidden');
-        
-        nodes = design.nodes.map(n => {
-            let absX = levelState.bLeftX + (n.relX * levelState.gapWidth);
-            let bankYAtX = levelState.isAsymmetric 
-                ? levelState.bankY + n.relX * (levelState.bankYRight - levelState.bankY)
-                : levelState.bankY;
-            let absY = bankYAtX + (n.relY * levelState.gapWidth);
-            return new Node(absX, absY, n.fixed);
-        });
-        
-        beams = design.beams
-            .filter(b => b.idxA >= 0 && b.idxB >= 0 && b.idxA < nodes.length && b.idxB < nodes.length)
-            .map(b => new Beam(nodes[b.idxA], nodes[b.idxB], b.size, !!b.isRoad));
-        
-        resetVehicleToStart();
-        
-        updateBudgetUI();
-        setSimulatingUI(false);
-        draw();
-        return true;
+        return restoreRelativeDesign(design);
     }
 
     // Anchor points for fixed geometry (Fixed Coordinate Locking)
@@ -635,9 +718,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const config = MATERIAL_CONFIG[b.size] || MATERIAL_CONFIG.standard;
             return acc + (b.length * config.cost);
         }, 0);
-        let remaining = budget - currentSpend;
-        if (budget > 1000000) {
-            budgetDisplay.innerText = "♾️ Unlimited";
+        const remaining = budget - currentSpend;
+        if (isUnlimitedBudget()) {
+            budgetDisplay.innerText = 'Unlimited';
             budgetDisplay.classList.remove('over-budget');
         } else {
             budgetDisplay.innerText = `$${Math.round(remaining).toLocaleString()}`;
@@ -649,9 +732,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function setOperationMode(mode) {
+        operationMode = mode;
+
+        const modeBtnEl = document.getElementById('btn-mode-toggle');
+        if (!modeBtnEl) return;
+
+        const modeSpan = modeBtnEl.querySelector('span');
+        const isDelete = mode === 'delete';
+
+        if (modeSpan) {
+            modeSpan.innerText = mode === 'truss' ? 'Truss' : isDelete ? 'Delete' : 'Road';
+        }
+
+        modeBtnEl.classList.toggle('danger-btn', isDelete);
+        modeBtnEl.style.color = isDelete
+            ? '#ef4444'
+            : mode === 'truss'
+                ? 'var(--accent)'
+                : 'var(--text-primary)';
+    }
+
     function initEnvironment(shouldRestore = false) {
         nodes = [];
         beams = [];
+        hoveredNode = null;
+        hoveredBeam = null;
+        draggingStartNode = null;
         ghostStructure = null;
         helpBlueprint = null; // Clear pedagogical lines on reset/restore
         isSimulating = false;
@@ -667,12 +774,7 @@ document.addEventListener('DOMContentLoaded', () => {
         redoStack = [];
         updateUndoButtons(); // Reflect the cleared stacks in the UI immediately
 
-        // Reset operation mode to build so the button label is always consistent.
-        operationMode = 'build';
-        const modeSpan = document.querySelector('#btn-mode-toggle span');
-        if (modeSpan) modeSpan.innerText = 'Build';
-        const modeBtnEl = document.getElementById('btn-mode-toggle');
-        if (modeBtnEl) modeBtnEl.classList.remove('danger-btn');
+        setOperationMode('road');
 
         if(animFrame) cancelAnimationFrame(animFrame);
         currentLevel = levelSelector ? levelSelector.value : 'river';
@@ -836,7 +938,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const mode = budgetSel.value;
             if (mode === 'pro') budget *= 0.8;
             else if (mode === 'easy') budget *= 1.5;
-            else if (mode === 'infinite') budget = 999999999;
+            else if (mode === 'infinite') budget = UNLIMITED_BUDGET;
         }
 
         resetVehicleToStart();
@@ -877,23 +979,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const modeToggleBtn = document.getElementById('btn-mode-toggle');
     if (modeToggleBtn) {
         modeToggleBtn.addEventListener('click', () => {
-            const span = modeToggleBtn.querySelector('span');
             // Cycle: Road -> Truss -> Delete
             if (operationMode === 'road') {
-                operationMode = 'truss';
-                if (span) span.innerText = 'Truss';
-                modeToggleBtn.classList.remove('danger-btn');
-                modeToggleBtn.style.color = 'var(--accent)';
+                setOperationMode('truss');
             } else if (operationMode === 'truss') {
-                operationMode = 'delete';
-                if (span) span.innerText = 'Delete';
-                modeToggleBtn.classList.add('danger-btn');
-                modeToggleBtn.style.color = '#ef4444';
+                setOperationMode('delete');
             } else {
-                operationMode = 'road';
-                if (span) span.innerText = 'Road';
-                modeToggleBtn.classList.remove('danger-btn');
-                modeToggleBtn.style.color = 'var(--text-primary)';
+                setOperationMode('road');
             }
         });
     }
@@ -929,21 +1021,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const entering = !document.fullscreenElement && !document.webkitFullscreenElement;
 
             // ① Snapshot structure IMMEDIATELY before layout shifts
-            const snapshot = {
-                freeNodeRels: nodes.filter(n => !n.fixed).map(n => {
-                    const relX = levelState.gapWidth > 0 ? (n.x - levelState.bLeftX) / levelState.gapWidth : 0;
-                    const bankYAtX = levelState.isAsymmetric ? levelState.bankY + relX * (levelState.bankYRight - levelState.bankY) : levelState.bankY;
-                    const relY = levelState.gapWidth > 0 ? (n.y - bankYAtX) / levelState.gapWidth : 0;
-                    return { relX, relY };
-                }),
-                beamDefs: beams.map(b => ({
-                    idxA: nodes.indexOf(b.nodeA),
-                    idxB: nodes.indexOf(b.nodeB),
-                    size: b.size,
-                    isRoad: b.isRoad
-                }))
-            };
-            window._fsSnapshot = snapshot;
+            window._fsSnapshot = captureRelativeDesign();
 
             // ② Fade out and switch mode
             animateOverlay(true, () => {
@@ -984,31 +1062,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (span) span.innerText = entering ? 'Exit' : 'Full';
 
         // snapshot relative state IMMEDIATELY before layout settles
-        const structuralSnapshot = {
-            freeNodeRels: nodes.filter(n => !n.fixed).map(n => {
-                const relX = levelState.gapWidth > 0 ? (n.x - levelState.bLeftX) / levelState.gapWidth : 0;
-                const bankYAtX = levelState.isAsymmetric ? levelState.bankY + relX * (levelState.bankYRight - levelState.bankY) : levelState.bankY;
-                const relY = levelState.gapWidth > 0 ? (n.y - bankYAtX) / levelState.gapWidth : 0;
-                return { relX, relY };
-            }),
-            beamDefs: beams.map(b => ({
-                idxA: nodes.indexOf(b.nodeA),
-                idxB: nodes.indexOf(b.nodeB),
-                size: b.size,
-                isRoad: b.isRoad
-            }))
-        };
+        const structuralSnapshot = window._fsSnapshot || captureRelativeDesign();
+        window._fsSnapshot = null;
 
         // Wait for CSS/Browser layout to settle
         setTimeout(() => {
             if (!canvas.parentElement) {
                 animateOverlay(false, () => { isFullscreenTransitioning = false; });
                 return;
-            }
-
-            // AUTO-RESET ON FAILURE
-            if (car.state === 'failed' || car.state === 'passed') {
-                initEnvironment(true); 
             }
 
             // Compute new canvas dimensions reliably from container
@@ -1021,26 +1082,8 @@ document.addEventListener('DOMContentLoaded', () => {
             canvas.height = Math.max(newH, 1);
 
             // Re-init recalibrates levelState (gapWidth, bLeftX, bankY) for new size
-            initEnvironment();
-
-            // Restore structure from snapshot using the new environmental coordinates
-            structuralSnapshot.freeNodeRels.forEach(nr => {
-                const bankYAtX = levelState.isAsymmetric ? levelState.bankY + nr.relX * (levelState.bankYRight - levelState.bankY) : levelState.bankY;
-                const absX = levelState.bLeftX + nr.relX * levelState.gapWidth;
-                const absY = bankYAtX + nr.relY * levelState.gapWidth;
-                nodes.push(new Node(absX, absY, false));
-            });
-
-            beams = structuralSnapshot.beamDefs
-                .filter(b => b.idxA >= 0 && b.idxB >= 0 && b.idxA < nodes.length && b.idxB < nodes.length)
-                .map(b => {
-                    const beam = new Beam(nodes[b.idxA], nodes[b.idxB], b.size);
-                    beam.isRoad = !!b.isRoad;
-                    return beam;
-                });
-
-            updateBudgetUI();
-            draw();
+            initEnvironment(false);
+            restoreRelativeDesign(structuralSnapshot);
             animateOverlay(false, () => { isFullscreenTransitioning = false; });
         }, 250);
     };
@@ -1358,17 +1401,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Win / Loss Conditions
-            if (car.y > canvas.height + 200) {
-                // Done simulating entirely - hide car
-                car.active = false;
-                // KEEP isSimulating=true so pulses and ghost rendering keep animating.
-                // We just stop the physics work by moving the condition into a sub-block.
-            } else if (car.state === 'driving' && car.y > canvas.height) {
+            if (car.state === 'driving' && car.y > canvas.height) {
                 // First time falling below screen
                 car.state = 'failed';
+                isSimulating = false;
                 let failReason = firstBrokenBeam ? `Beam snapped at ${(brokeStrain * 100).toFixed(0)}% stress!` : 'Catastrophic Structural Failure! The vehicle fell.';
                 showPuzzleStatus(false, failReason);
                 // Keep UI DISABLED until explicitly closed or reset
+            } else if (car.y > canvas.height + 200) {
+                // Done simulating entirely - hide car
+                car.active = false;
             } else if (car.state === 'driving' && car.x > levelState.bRightX + 20) {
                 car.state = 'passed';
                 // Success: Stop the loop since we usually transition or celebrate
@@ -1388,6 +1430,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showPuzzleStatus(isSuccess, message) {
         statusBanner.className = 'game-status';
         statusBanner.classList.add(isSuccess ? 'success' : 'failure');
+        statusBanner.classList.remove('hidden');
         statusText.innerText = message;
         
         const helpBtn = document.getElementById('btn-status-help');
@@ -1435,8 +1478,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // Re-enable UI so the user can BUILD (or delete), 
             // but the Run button will stay disabled (managed in setSimulatingUI) 
             // until they make a change.
+            restoreGhostNodePositions();
+            ghostStructure = null;
+            isSimulating = false;
             setSimulatingUI(false);
+            draw();
         } else if (car.state === 'passed') {
+            restoreGhostNodePositions();
+            ghostStructure = null;
             isSimulating = false;
             setSimulatingUI(false);
             car.active = false;
@@ -1849,7 +1898,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Allow Restart if not simulating OR if already failed/passed (Visual Review phase)
         if(!isSimulating || car.state === 'failed' || car.state === 'passed') {
             updateBudgetUI(); // One last check
-            if (budget - currentSpend < 0 && budget < 1000000) {
+            if (budget - currentSpend < 0 && !isUnlimitedBudget()) {
                 showPuzzleStatus(false, 'Cannot test: You are over budget! Delete beams.');
                 return;
             }
@@ -1863,7 +1912,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Capture Ghost State for post-mortem analysis
             ghostStructure = {
-                nodes: nodes.map(n => ({ x: n.x, y: n.y })),
+                nodes: nodes.map(n => ({ x: n.x, y: n.y, fixed: n.fixed })),
                 beams: beams.map(b => ({
                     x1: b.nodeA.x, y1: b.nodeA.y,
                     x2: b.nodeB.x, y2: b.nodeB.y,
@@ -1882,6 +1931,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
+        const activeTag = document.activeElement?.tagName;
+        const isTypingTarget = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT';
+
+        if (!e.ctrlKey && !e.metaKey && !e.altKey && !isTypingTarget && (e.key === 'g' || e.key === 'G')) {
+            e.preventDefault();
+            gridToggleBtn?.click();
+            return;
+        }
+
         if (e.ctrlKey || e.metaKey) {
             if (e.key === 'z' || e.key === 'Z') {
                 e.preventDefault();
