@@ -333,7 +333,7 @@ a {
     transition: color 0.3s;
 }
 
-.logo-dot {
+.logo-theme {
     color: var(--accent);
     transition: color 0.3s;
 }
