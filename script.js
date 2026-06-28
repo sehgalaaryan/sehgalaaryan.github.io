@@ -1,8 +1,3 @@
-/**
- * Aaryan Sehgal Portfolio - Core Script
- * Refactored for modularity, maintenance, and enhanced features.
- */
-
 document.addEventListener("DOMContentLoaded", () => {
     initApp();
 });
@@ -50,7 +45,7 @@ const ThemeManager = {
                 this.setTheme(btn.getAttribute('data-theme-btn'));
             });
         });
-        
+
         // Initial slider position after bounds settle
         setTimeout(() => this.updateSlider(), 100);
     },
@@ -60,13 +55,13 @@ const ThemeManager = {
         localStorage.setItem('theme', theme);
         this.updateSlider();
     },
-    
+
     updateSlider() {
         const theme = localStorage.getItem('theme') || 'dark';
         this.btns.forEach(btn => {
             const isActive = btn.getAttribute('data-theme-btn') === theme;
             btn.classList.toggle('active', isActive);
-            
+
             if (isActive && this.slider) {
                 requestAnimationFrame(() => {
                     this.slider.style.width = `${btn.offsetWidth}px`;
@@ -336,7 +331,7 @@ const AnimationEngine = {
 
         container.addEventListener('scroll', updateMasks);
         window.addEventListener('resize', updateMasks);
-        
+
         // Initial call after a brief timeout to ensure layout is settled
         setTimeout(updateMasks, 100);
     },
@@ -380,9 +375,6 @@ const AnimationEngine = {
             link.classList.toggle('active', link.getAttribute('href') === `#${currentSection}`);
         });
 
-        const navMenu = NavigationManager.menu || document.getElementById('nav-menu');
-        const shouldHideForPuzzle = currentSection === 'puzzle' && !navMenu?.classList.contains('open');
-        navbar.classList.toggle('puzzle-hidden', shouldHideForPuzzle);
     },
 
     initTypewriter() {
@@ -477,26 +469,26 @@ const AnimationEngine = {
         sections.forEach(section => {
             const track = section.querySelector('.horizontal-track') || section.querySelector('.reverse-track');
             const progressBar = section.querySelector('.scroll-progress-bar');
-            
+
             if (!track) return;
-            
+
             const rect = section.getBoundingClientRect();
             const startVisible = rect.top;
             const totalScrollable = rect.height - window.innerHeight;
-            
+
             let progress = -startVisible / totalScrollable;
             progress = Math.max(0, Math.min(1, progress));
-            
+
             // Calculate max scroll distance dynamically bounding to the new CSS padded edges.
             const maxScrollDist = Math.max(track.scrollWidth - window.innerWidth, 0);
-            
+
             // Multiply by positive 1 for reverse-tracks, pulling the UI horizontally left-to-right.
             const isReverse = track.classList.contains('reverse-track');
             const direction = isReverse ? 1 : -1;
-            
+
             track.style.transform = `translateX(${direction * progress * maxScrollDist}px)`;
             this.updatePanoramaCards(track);
-            
+
             // Background Dimming Animation
             const stickyContainer = section.querySelector('.sticky-container');
             if (stickyContainer) {
@@ -506,7 +498,7 @@ const AnimationEngine = {
                     stickyContainer.classList.remove('bg-focus');
                 }
             }
-            
+
             if (progressBar) {
                 progressBar.style.width = `${progress * 100}%`;
                 if (isReverse) {
@@ -591,12 +583,20 @@ const ProjectShowcase = {
 
         return candidates[0];
     },
-    
+
     init() {
         this.modal = document.getElementById('project-modal');
         this.closeBtn = document.querySelector('.modal-close');
         this.content = this.modal ? this.modal.querySelector('.modal-content') : null;
         this.lastCard = null;
+
+        document.querySelectorAll('.project-card').forEach(card => {
+            const imgEl = card.querySelector('.project-img');
+            const imgSrc = card.getAttribute('data-project-img');
+            if (imgEl && imgSrc) {
+                imgEl.style.backgroundImage = `url('${imgSrc}')`;
+            }
+        });
 
         if (!this.modal) return;
 
@@ -607,9 +607,9 @@ const ProjectShowcase = {
                 if (!card || !portfolioSection.contains(card)) return;
 
                 this.lastCard = card;
-                const title = card.querySelector('h3').innerText;
-                const desc = card.querySelector('p').innerText;
-                const img = card.getAttribute('data-project-img') || 'project-placeholder.jpg';
+                const title = card.querySelector('h3').textContent;
+                const desc = card.querySelector('p').textContent;
+                const img = card.getAttribute('data-project-img') || 'assets/portfolio/bridge.jpg';
 
                 this.openModal(title, desc, img);
             });
@@ -657,7 +657,7 @@ const ProjectShowcase = {
         this.modal.style.visibility = 'hidden';
         this.modal.style.display = 'flex';
         this.modal.classList.add('open');
-        
+
         // 4. LAST: Record Modal Position
         const modalRect = this.content.getBoundingClientRect();
 
@@ -671,7 +671,7 @@ const ProjectShowcase = {
         this.content.style.transition = 'none';
         this.content.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`;
         this.content.style.opacity = '0';
-        
+
         // Force reflow
         this.content.offsetHeight;
 
@@ -681,7 +681,7 @@ const ProjectShowcase = {
         this.content.style.transform = 'none';
         this.content.style.opacity = '1';
 
-        document.body.style.overflow = 'hidden'; 
+        document.body.style.overflow = 'hidden';
     },
 
     closeModal() {
@@ -718,7 +718,7 @@ const ProjectShowcase = {
             this.modal.style.display = 'none';
             this.modal.style.visibility = '';
             this.content.style.transform = '';
-            document.body.style.overflow = ''; 
+            document.body.style.overflow = '';
         }, 600); // Match transition duration
     }
 };
@@ -762,22 +762,22 @@ const ToastManager = {
 const MagneticEffect = {
     init() {
         if (window.innerWidth <= 1024 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-        
+
         document.querySelectorAll('.btn-magnetic').forEach(btn => {
             btn.addEventListener('mousemove', e => {
                 const rect = btn.getBoundingClientRect();
                 const x = e.clientX - rect.left - rect.width / 2;
                 const y = e.clientY - rect.top - rect.height / 2;
-                
+
                 // Pull content (text/icon) more than the button itself
                 const content = btn.querySelector('span, i') || btn;
-                
+
                 btn.style.transform = `translate(${x * 0.15}px, ${y * 0.15}px)`;
                 if (content !== btn) {
                     content.style.transform = `translate(${x * 0.1}px, ${y * 0.1}px)`;
                 }
             });
-            
+
             btn.addEventListener('mouseleave', () => {
                 const content = btn.querySelector('span, i') || btn;
                 btn.style.transform = '';
@@ -801,7 +801,7 @@ const ContactForm = {
                 const mail = 'aaryan.sehgal.3070@gmail.com';
                 const subject = encodeURIComponent('Inquiry from Portfolio');
                 window.location.href = `mailto:${mail}?subject=${subject}&body=${body}`;
-                
+
                 // Enhanced user feedback
                 if (window.showToast) {
                     window.showToast('Opening default email client...', 'success');

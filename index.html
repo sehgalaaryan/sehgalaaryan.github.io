@@ -26,10 +26,10 @@
     <meta name="twitter:image" content="https://sehgalaaryan.github.io/og-image.jpg"> <!-- Placeholder -->
 
     <!-- Favicon -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    <link rel="manifest" href="/site.webmanifest">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/favicon/favicon-16x16.png">
+    <link rel="manifest" href="assets/favicon/site.webmanifest">
 
     <!-- Google Analytics 4 (GA4) Placeholder -->
     <!-- Replace 'G-XXXXXXXXXX' with your actual Measurement ID -->
@@ -69,9 +69,9 @@
                 <div class="line"></div>
                 <div class="line"></div>
             </button>
-            <div class="logo group">
+            <a href="#" class="logo group" onclick="window.location.href = window.location.pathname; return false;" title="Refresh and scroll to top">
                 <span class="logo-static">A</span><span class="logo-theme">S</span>
-            </div>
+            </a>
         </div>
 
         <!-- Responsive Nav Links -->
@@ -96,7 +96,8 @@
     </nav>
 
     <main>
-        <header class="hero scrub-target" id="about" data-scrub-type="hero">
+        <div id="about" style="position: absolute; top: 0; left: 0;"></div>
+        <header class="hero scrub-target" data-scrub-type="hero">
             <div class="hero-container">
                 <div class="hero-content">
                     <div class="hero-text-top">
@@ -131,7 +132,7 @@
                     </div>
                     <div class="cta-buttons">
                         <a href="#portfolio" class="btn primary btn-glow btn-magnetic"><span>View Portfolio</span></a>
-                        <a href="resume.pdf" class="btn outline hover-lift btn-magnetic" download><span>Download
+                        <a href="assets/resume.pdf" class="btn outline hover-lift btn-magnetic" download><span>Download
                                 CV</span></a>
                         <a href="#contact" class="btn outline hover-lift btn-magnetic"><span>Contact</span></a>
                     </div>
@@ -140,7 +141,7 @@
                     <div class="image-wrapper">
                         <div class="glow-backdrop"></div>
                         <div class="image-placeholder">
-                            <img src="profile-photo.jpg" alt="Aaryan Sehgal - Bridge Engineer">
+                            <img src="assets/images/profile-photo.jpg" alt="Aaryan Sehgal - Bridge Engineer">
                             <span class="placeholder-text">Insert Photo here</span>
                         </div>
                     </div>
@@ -164,7 +165,7 @@
                 </div>
             </div>
         </div>
-        <section id="background" class="section scrub-target" data-scrub-type="fade-up">
+        <section id="background" class="section">
             <div class="container section-grid about-grid">
 
                 <!-- Sticky Left Column -->
@@ -252,8 +253,8 @@
 
                 <div class="horizontal-track scroll-target">
                     <!-- Project 1 -->
-                    <div class="project-card hover-3d" data-project-img="project-bridge.jpg">
-                        <div class="project-img">🌉</div>
+                    <div class="project-card hover-3d" data-project-img="assets/portfolio/bridge.jpg">
+                        <div class="project-img"></div>
                         <div class="project-info">
                             <h3>Long-Span Suspension Infrastructure</h3>
                             <p>Conducted comprehensive structural evaluations and design optimizations for multi-span
@@ -261,8 +262,8 @@
                         </div>
                     </div>
                     <!-- Project 2 -->
-                    <div class="project-card hover-3d" data-project-img="project-highway.jpg">
-                        <div class="project-img">🛣️</div>
+                    <div class="project-card hover-3d" data-project-img="assets/portfolio/bridge.jpg">
+                        <div class="project-img"></div>
                         <div class="project-info">
                             <h3>Seismic-Resilient Transport Corridors</h3>
                             <p>Implemented advanced seismic analysis and mitigation strategies for major highway
@@ -270,8 +271,8 @@
                         </div>
                     </div>
                     <!-- Project 3 -->
-                    <div class="project-card hover-3d" data-project-img="project-placeholder.jpg">
-                        <div class="project-img">🏗️</div>
+                    <div class="project-card hover-3d" data-project-img="assets/portfolio/bridge.jpg">
+                        <div class="project-img"></div>
                         <div class="project-info">
                             <h3>Commercial Tower Foundation</h3>
                             <p>Placeholder description for a future portfolio addition. Focus on deep foundation
@@ -279,8 +280,8 @@
                         </div>
                     </div>
                     <!-- Project 4 -->
-                    <div class="project-card hover-3d" data-project-img="project-placeholder.jpg">
-                        <div class="project-img">🏙️</div>
+                    <div class="project-card hover-3d" data-project-img="assets/portfolio/bridge.jpg">
+                        <div class="project-img"></div>
                         <div class="project-info">
                             <h3>Urban Wind Load Study</h3>
                             <p>Placeholder description. Details on aerodynamic structural reinforcements for supertall
@@ -288,8 +289,8 @@
                         </div>
                     </div>
                     <!-- Project 5 -->
-                    <div class="project-card hover-3d" data-project-img="project-placeholder.jpg">
-                        <div class="project-img">🏢</div>
+                    <div class="project-card hover-3d" data-project-img="assets/portfolio/bridge.jpg">
+                        <div class="project-img"></div>
                         <div class="project-info">
                             <h3>Retrofitting Municipal Structures</h3>
                             <p>Placeholder description. Outline of restoring and reinforcing century-old infrastructure
@@ -297,8 +298,8 @@
                         </div>
                     </div>
                     <!-- Project 6 -->
-                    <div class="project-card hover-3d" data-project-img="project-placeholder.jpg">
-                        <div class="project-img">🚆</div>
+                    <div class="project-card hover-3d" data-project-img="assets/portfolio/bridge.jpg">
+                        <div class="project-img"></div>
                         <div class="project-info">
                             <h3>High-Speed Rail Viaducts</h3>
                             <p>Placeholder description. Design and integration of precast concrete segmental bridges for
@@ -319,60 +320,183 @@
                 <h2 class="section-title center sticky-title">Technical <span class="highlight">Expertise</span></h2>
 
                 <div class="reverse-track scroll-target">
-                    <div class="skill-card hover-3d">
-                        <div class="card-content">
-                            <div class="card-icon">🏗️</div>
-                            <div class="skill-card-meta">Analysis</div>
-                            <h3>Finite Element Analysis (FEA)</h3>
+                    <!-- Apps -->
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon"><img src="assets/logos/midas.png" alt="MIDAS Civil" class="app-logo"></div>
+                                <h3>MIDAS Civil</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>MIDAS Civil</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for expertise]</li>
+                                    <li>[Placeholder for expertise]</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                    <div class="skill-card hover-3d">
-                        <div class="card-content">
-                            <div class="card-icon">📐</div>
-                            <div class="skill-card-meta">Bridge Suite</div>
-                            <h3>SAP2000 / CSI Bridge</h3>
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon"><img src="assets/logos/ideastatica.png" alt="IDEA StatiCa" class="app-logo"></div>
+                                <h3>IDEA StatiCa</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>IDEA StatiCa</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for expertise]</li>
+                                    <li>[Placeholder for expertise]</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                    <div class="skill-card hover-3d">
-                        <div class="card-content">
-                            <div class="card-icon">🌉</div>
-                            <div class="skill-card-meta">Modeling</div>
-                            <h3>MIDAS Civil</h3>
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon"><img src="assets/logos/sap2000.png" alt="SAP2000" class="app-logo"></div>
+                                <h3>SAP2000</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>SAP2000</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for expertise]</li>
+                                    <li>[Placeholder for expertise]</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                    <div class="skill-card hover-3d">
-                        <div class="card-content">
-                            <div class="card-icon">💻</div>
-                            <div class="skill-card-meta">Geometry</div>
-                            <h3>Bridge Geometry &amp; Alignment</h3>
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon"><img src="assets/logos/autocad.png" alt="AutoCAD" class="app-logo"></div>
+                                <h3>AutoCAD</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>AutoCAD</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for expertise]</li>
+                                    <li>[Placeholder for expertise]</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                    <div class="skill-card hover-3d">
-                        <div class="card-content">
-                            <div class="card-icon">&#127752;</div>
-                            <div class="skill-card-meta">Modeling</div>
-                            <h3>MIDAS Civil</h3>
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon"><img src="assets/logos/mathcad.png" alt="MathCAD" class="app-logo"></div>
+                                <h3>MathCAD</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>MathCAD</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for expertise]</li>
+                                    <li>[Placeholder for expertise]</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                    <div class="skill-card hover-3d">
-                        <div class="card-content">
-                            <div class="card-icon">&#127752;</div>
-                            <div class="skill-card-meta">Modeling</div>
-                            <h3>MIDAS Civil</h3>
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon"><img src="assets/logos/excel.png" alt="Excel" class="app-logo"></div>
+                                <h3>Excel</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>Excel</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for expertise]</li>
+                                    <li>[Placeholder for expertise]</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                    <div class="skill-card hover-3d">
-                        <div class="card-content">
-                            <div class="card-icon">&#127752;</div>
-                            <div class="skill-card-meta">Modeling</div>
-                            <h3>MIDAS Civil</h3>
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon"><img src="assets/logos/word.png" alt="Word" class="app-logo"></div>
+                                <h3>Word</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>Word</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for expertise]</li>
+                                    <li>[Placeholder for expertise]</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
-                    <div class="skill-card hover-3d">
-                        <div class="card-content">
-                            <div class="card-icon">&#127752;</div>
-                            <div class="skill-card-meta">Modeling</div>
-                            <h3>MIDAS Civil</h3>
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon"><img src="assets/logos/vba.png" alt="VBA" class="app-logo"></div>
+                                <h3>VBA</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>VBA</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for expertise]</li>
+                                    <li>[Placeholder for expertise]</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Codes -->
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon code-icon">📜</div>
+                                <h3>AASHTO LRFD 2020</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>AASHTO LRFD 2020</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for codal expertise]</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon code-icon">📜</div>
+                                <h3>CSA S6:19</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>CSA S6:19</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for codal expertise]</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon code-icon">📜</div>
+                                <h3>CSA O86-16</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>CSA O86-16</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for codal expertise]</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="skill-card">
+                        <div class="flip-inner">
+                            <div class="flip-front card-content">
+                                <div class="card-icon code-icon">📜</div>
+                                <h3>WSDOT BDM</h3>
+                            </div>
+                            <div class="flip-back card-content">
+                                <h3>WSDOT BDM</h3>
+                                <ul class="expertise-list">
+                                    <li>[Placeholder for codal expertise]</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -385,7 +509,7 @@
         </section>
 
         <!-- Interactive Game Section -->
-        <section id="puzzle" class="section interactive-game-section scrub-target" data-scrub-type="scale-up">
+        <section id="puzzle" class="section interactive-game-section">
             <div class="container">
                 <h2 class="section-title center puzzle-heading">Truss Builder <span class="highlight">Puzzle</span></h2>
                 <p class="center text-secondary mx-auto text-max-width puzzle-intro">
@@ -587,7 +711,7 @@
         </section>
 
         <!-- Contact Section -->
-        <section id="contact" class="section scrub-target" data-scrub-type="fade-up">
+        <section id="contact" class="section">
             <div class="container contact-container">
                 <h2 class="section-title">Get In <span class="highlight">Touch</span></h2>
                 <div class="glass-card contact-card">
