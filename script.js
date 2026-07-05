@@ -54,6 +54,18 @@ const ThemeManager = {
         this.htmlEl.setAttribute('data-theme', theme);
         localStorage.setItem('theme', theme);
         this.updateSlider();
+
+        // Update Mobile Theme Color Meta Tag
+        const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+        if (metaThemeColor) {
+            if (theme === 'dark') {
+                metaThemeColor.setAttribute('content', '#0a0a0a');
+            } else if (theme === 'light') {
+                metaThemeColor.setAttribute('content', '#ffffff');
+            } else if (theme === 'vibrant') {
+                metaThemeColor.setAttribute('content', '#090014');
+            }
+        }
     },
 
     updateSlider() {
@@ -92,7 +104,16 @@ const NavigationManager = {
         });
 
         document.querySelectorAll('.nav-item').forEach(link => {
-            link.addEventListener('click', () => {
+            link.addEventListener('click', (e) => {
+                const targetId = link.getAttribute('href');
+                
+                // If About section, force scroll to absolute top to bypass transform offsets
+                if (targetId === '#about') {
+                    e.preventDefault();
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    history.pushState(null, null, '#about');
+                }
+                
                 this.menu.classList.remove('open');
                 this.toggle.classList.remove('active');
                 this.toggle.setAttribute('aria-expanded', 'false');
